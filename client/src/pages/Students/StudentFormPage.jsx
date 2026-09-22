@@ -277,6 +277,8 @@ const StudentFormPage = () => {
     );
   }
 
+  const inputStyles = "w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-sm focus:ring-2 focus:ring-red-500";
+
   return (
     <MainLayout>
       <Navbar title={isEdit ? `Edit Student: ${formData.studentId || ''}` : 'Add New Student Record'} />
