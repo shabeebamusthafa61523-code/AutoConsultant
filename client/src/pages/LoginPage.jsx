@@ -35,20 +35,17 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-800 overflow-hidden">
-        {/* Header with Logo */}
-        <div className="bg-slate-50 p-8 border-b border-slate-200 text-center flex flex-col items-center">
+        {/* Header with Clean Logo (No background box & no text) */}
+        <div className="pt-8 px-8 pb-4 text-center flex flex-col items-center">
           <img
             src="/logo.png"
             alt="BENZ Driving School"
-            className="w-24 h-24 object-contain mb-3"
+            className="w-32 h-32 object-contain"
           />
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">BENZ DRIVING SCHOOL</h1>
-          <p className="text-xs font-bold text-red-600 uppercase tracking-widest mt-0.5">West Kodur</p>
-          <p className="text-xs text-slate-400 mt-2">Management System Portal</p>
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="p-8 space-y-5">
+        <form onSubmit={handleSubmit} className="px-8 pb-8 pt-2 space-y-5">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-2.5 rounded-md flex items-center gap-2">
               <AlertCircle size={16} className="shrink-0 text-red-600" />
