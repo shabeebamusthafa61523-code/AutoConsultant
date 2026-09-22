@@ -8,7 +8,7 @@ import EmptyState from '../components/EmptyState';
 import Modal from '../components/Modal';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { getUsers, createUser, updateUser, deleteUser } from '../services/userService';
-import { Plus, Edit, Trash2, ShieldCheck, UserCheck } from 'lucide-react';
+import { Plus, Edit, Trash2, ShieldCheck, UserCheck, Eye, EyeOff } from 'lucide-react';
 
 const UsersPage = () => {
   const [users, setUsers] = useState([]);
@@ -19,6 +19,7 @@ const UsersPage = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     username: '',
@@ -51,6 +52,7 @@ const UsersPage = () => {
 
   const handleOpenAddModal = () => {
     setEditingUser(null);
+    setShowPassword(false);
     setFormData({
       name: '',
       username: '',
@@ -64,6 +66,7 @@ const UsersPage = () => {
 
   const handleOpenEditModal = (user) => {
     setEditingUser(user);
+    setShowPassword(false);
     setFormData({
       name: user.name || '',
       username: user.username || '',
@@ -273,14 +276,24 @@ const UsersPage = () => {
               <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Password {editingUser ? '(Leave blank to keep unchanged)' : '*'}
               </label>
-              <input
-                type="password"
-                required={!editingUser}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Password"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required={!editingUser}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Password"
+                  className="w-full pl-3 pr-10 py-2 border border-slate-300 rounded-md text-sm font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700 transition"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
           </div>
 
