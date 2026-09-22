@@ -252,6 +252,13 @@ const StudentDetailPage = () => {
                   {student.testDate ? `${new Date(student.testDate).toLocaleDateString()} (${student.testStatus})` : 'Not Scheduled'}
                 </span>
               </div>
+              <div>
+                <span className="text-slate-400 block font-medium">Application Info</span>
+                <span className="font-semibold text-slate-800">
+                  {student.application || (student.newApplication ? 'New Application' : 'Regular')}
+                  {student.applicationOpen !== undefined && ` (${student.applicationOpen ? 'Open' : 'Closed'})`}
+                </span>
+              </div>
             </div>
 
             {/* Document Readiness Badges */}
