@@ -16,6 +16,7 @@ const batchRoutes = require('./routes/batchRoutes');
 const classRoutes = require('./routes/classRoutes');
 const enquiryRoutes = require('./routes/enquiryRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const courseFeeRoutes = require('./routes/courseFeeRoutes');
 const userRoutes = require('./routes/userRoutes');
 
 // Connect to MongoDB Atlas
@@ -44,6 +45,7 @@ app.use('/api/batches', batchRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/course-fees', courseFeeRoutes);
 
 // Centralized Error Handler
 app.use(errorHandler);

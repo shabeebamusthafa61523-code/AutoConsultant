@@ -9,6 +9,7 @@ import Modal from '../../components/Modal';
 import { getStudentDetails } from '../../services/studentService';
 import { createClass } from '../../services/classService';
 import { createPayment } from '../../services/paymentService';
+import { getUsers } from '../../services/userService';
 import { ArrowLeft, Edit, Plus, CheckCircle, XCircle, CreditCard, Calendar } from 'lucide-react';
 
 const StudentDetailPage = () => {
@@ -16,6 +17,7 @@ const StudentDetailPage = () => {
   const navigate = useNavigate();
 
   const [details, setDetails] = useState(null);
+  const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -47,11 +49,19 @@ const StudentDetailPage = () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await getStudentDetails(id);
+      const [res, userRes] = await Promise.all([
+        getStudentDetails(id),
+        getUsers()
+      ]);
+
       setDetails(res);
+      const eligibleInstructors = (userRes || []).filter(u => u.role !== 'Superadmin');
+      setInstructors(eligibleInstructors);
 
       if (res.student?.batch?.instructor) {
         setClassFormData(prev => ({ ...prev, instructor: res.student.batch.instructor }));
+      } else if (eligibleInstructors.length > 0) {
+        setClassFormData(prev => ({ ...prev, instructor: eligibleInstructors[0].name }));
       }
     } catch (err) {
       setError(err.message || 'Failed to fetch student details.');
@@ -381,14 +391,20 @@ const StudentDetailPage = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Instructor</label>
-              <input
-                type="text"
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Instructor *</label>
+              <select
+                required
                 value={classFormData.instructor}
                 onChange={(e) => setClassFormData({ ...classFormData, instructor: e.target.value })}
-                placeholder="Instructor Name"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
-              />
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white text-slate-800"
+              >
+                <option value="">-- Select Instructor --</option>
+                {instructors.map((u) => (
+                  <option key={u._id} value={u.name}>
+                    {u.name} ({u.role})
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Vehicle No.</label>

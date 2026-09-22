@@ -14,6 +14,7 @@ import BatchDetailPage from './pages/Batches/BatchDetailPage';
 import ClassListPage from './pages/Classes/ClassListPage';
 import EnquiryListPage from './pages/Enquiries/EnquiryListPage';
 import PaymentListPage from './pages/Payments/PaymentListPage';
+import CourseFeeListPage from './pages/CourseFees/CourseFeeListPage';
 import UsersPage from './pages/UsersPage';
 
 function App() {
@@ -46,6 +47,9 @@ function App() {
 
             {/* Payment Routes */}
             <Route path="/payments" element={<ProtectedRoute><PaymentListPage /></ProtectedRoute>} />
+
+            {/* Course Fee Routes */}
+            <Route path="/course-fees" element={<ProtectedRoute><CourseFeeListPage /></ProtectedRoute>} />
 
             {/* Users Route */}
             <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
