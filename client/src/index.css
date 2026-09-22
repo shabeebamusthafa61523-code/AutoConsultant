@@ -4,11 +4,100 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-800 antialiased;
+    @apply bg-slate-50 text-slate-800 antialiased transition-colors duration-200;
   }
   
   /* Focus Ring Default to BENZ Red */
   input:focus, select:focus, textarea:focus {
     @apply outline-none ring-2 ring-red-500 border-red-500;
   }
+}
+
+/* Remove White Canvas Background & Adjust Logo Colors for Light/Dark Mode */
+img[src="/logo.png"] {
+  mix-blend-mode: multiply;
+}
+
+.dark img[src="/logo.png"] {
+  mix-blend-mode: screen;
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* 100% Guaranteed Dark Mode Theme Overrides */
+html.dark,
+body.dark,
+.dark {
+  color-scheme: dark;
+  background-color: #0f172a !important; /* slate-900 */
+  color: #f8fafc !important; /* slate-50 */
+}
+
+.dark body,
+.dark #root {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+/* Header, Sidebar, Cards & Containers in Dark Mode */
+.dark header,
+.dark aside,
+.dark .bg-white,
+.dark .bg-slate-50 {
+  background-color: #1e293b !important; /* slate-800 */
+  border-color: #334155 !important; /* slate-700 */
+  color: #f8fafc !important;
+}
+
+/* Text Overrides for Dark Mode */
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-slate-600 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: #94a3b8 !important; /* slate-400 */
+}
+
+/* Table Rows & Dividers in Dark Mode */
+.dark table,
+.dark th,
+.dark td,
+.dark tr {
+  border-color: #334155 !important;
+}
+
+.dark thead tr {
+  background-color: #0f172a !important;
+  color: #cbd5e1 !important;
+}
+
+.dark tbody tr:hover {
+  background-color: #334155 !important;
+}
+
+/* Form Inputs & Select Dropdowns in Dark Mode */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+/* Modals & Dialogs in Dark Mode */
+.dark .fixed {
+  background-color: rgba(15, 23, 42, 0.75) !important;
+}
+
+/* Stat Cards Icon Containers & Badges */
+.dark .bg-slate-100 {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
 }

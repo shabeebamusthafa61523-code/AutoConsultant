@@ -6,7 +6,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
 import { createStudent, getStudentById, updateStudent } from '../../services/studentService';
 import { getBatches } from '../../services/batchService';
-import { Save, X, ArrowLeft } from 'lucide-react';
+import { Save, ArrowLeft } from 'lucide-react';
 
 const StudentFormPage = () => {
   const navigate = useNavigate();
@@ -78,7 +78,7 @@ const StudentFormPage = () => {
         }
       } catch (err) {
         setError(err.message || 'Failed to load form data');
-      } finally {
+      } flex: {
         setLoading(false);
       }
     };
@@ -156,6 +156,8 @@ const StudentFormPage = () => {
     );
   }
 
+  const inputStyles = "w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-sm focus:ring-2 focus:ring-red-500";
+
   return (
     <MainLayout>
       <Navbar title={isEdit ? `Edit Student: ${formData.studentId || ''}` : 'Add New Student'} />
@@ -164,7 +166,7 @@ const StudentFormPage = () => {
         <div className="flex items-center justify-between">
           <Link
             to="/students"
-            className="text-xs font-semibold text-slate-600 hover:text-slate-800 flex items-center gap-1"
+            className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1"
           >
             <ArrowLeft size={16} /> Back to Students
           </Link>
@@ -172,7 +174,7 @@ const StudentFormPage = () => {
             <button
               type="button"
               onClick={() => navigate('/students')}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-md transition"
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-md transition"
             >
               Cancel
             </button>
@@ -190,24 +192,24 @@ const StudentFormPage = () => {
         {error && <ErrorMessage message={error} />}
 
         {/* SECTION 1: Basic Details */}
-        <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-bold text-slate-800 text-base border-b border-slate-100 pb-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base border-b border-slate-100 dark:border-slate-700 pb-2">
             1. Basic Details
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {isEdit && (
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Student ID (Auto)</label>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Student ID (Auto)</label>
                 <input
                   type="text"
                   value={formData.studentId || ''}
                   disabled
-                  className="w-full px-3 py-2 bg-slate-100 border border-slate-300 rounded-md text-sm font-mono font-bold text-indigo-700"
+                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-sm font-mono font-bold text-red-600 dark:text-red-400"
                 />
               </div>
             )}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                 Full Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -217,22 +219,22 @@ const StudentFormPage = () => {
                 value={formData.fullName}
                 onChange={handleChange}
                 placeholder="Enter full name"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Alias / Source Name</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Alias / Source Name</label>
               <input
                 type="text"
                 name="aliasSourceName"
                 value={formData.aliasSourceName}
                 onChange={handleChange}
                 placeholder="e.g. Walk-in, Website, Referral"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                 Primary Mobile <span className="text-red-500">*</span>
               </label>
               <input
@@ -242,57 +244,57 @@ const StudentFormPage = () => {
                 value={formData.primaryMobile}
                 onChange={handleChange}
                 placeholder="10 digit mobile number"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 font-mono"
+                className={`${inputStyles} font-mono`}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Alternate Mobile</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Alternate Mobile</label>
               <input
                 type="text"
                 name="alternateMobile"
                 value={formData.alternateMobile}
                 onChange={handleChange}
                 placeholder="Alternate contact"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 font-mono"
+                className={`${inputStyles} font-mono`}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Date of Birth</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Date of Birth</label>
               <input
                 type="date"
                 name="dob"
                 value={formData.dob}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               />
             </div>
           </div>
         </div>
 
         {/* SECTION 2: Licence / Service */}
-        <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-bold text-slate-800 text-base border-b border-slate-100 pb-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base border-b border-slate-100 dark:border-slate-700 pb-2">
             2. Licence & Service Details
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Licence / Service Type</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Licence / Service Type</label>
               <input
                 type="text"
                 name="licenceServiceType"
                 value={formData.licenceServiceType}
                 onChange={handleChange}
                 placeholder="e.g. Fresh Licence, Renewal"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Vehicle Type</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Vehicle Type</label>
               <select
                 name="vehicleType"
                 value={formData.vehicleType}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               >
                 <option value="4 Wheeler">4 Wheeler</option>
                 <option value="2 Wheeler">2 Wheeler</option>
@@ -300,53 +302,53 @@ const StudentFormPage = () => {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Licence Category</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Licence Category</label>
               <input
                 type="text"
                 name="licenceCategory"
                 value={formData.licenceCategory}
                 onChange={handleChange}
                 placeholder="e.g. LMV, MCWG, HMV"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Application No.</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Application No.</label>
               <input
                 type="text"
                 name="applicationNo"
                 value={formData.applicationNo}
                 onChange={handleChange}
                 placeholder="RTO Application Number"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 font-mono"
+                className={`${inputStyles} font-mono`}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Registration Date</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Registration Date</label>
               <input
                 type="date"
                 name="registrationDate"
                 value={formData.registrationDate}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               />
             </div>
           </div>
         </div>
 
         {/* SECTION 3: Batch & Workflow */}
-        <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-bold text-slate-800 text-base border-b border-slate-100 pb-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base border-b border-slate-100 dark:border-slate-700 pb-2">
             3. Batch & Workflow
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Assigned Batch</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Assigned Batch</label>
               <select
                 name="batch"
                 value={formData.batch}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               >
                 <option value="">-- Select Batch --</option>
                 {batches.map((b) => (
@@ -357,12 +359,12 @@ const StudentFormPage = () => {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Workflow Stage</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Workflow Stage</label>
               <select
                 name="workflowStage"
                 value={formData.workflowStage}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               >
                 <option value="Registration">Registration</option>
                 <option value="LL Approved">LL Approved</option>
@@ -373,12 +375,12 @@ const StudentFormPage = () => {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Current Status</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Current Status</label>
               <select
                 name="currentStatus"
                 value={formData.currentStatus}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               >
                 <option value="Active">Active</option>
                 <option value="Pending">Pending</option>
@@ -388,43 +390,43 @@ const StudentFormPage = () => {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Next Action</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Next Action</label>
               <input
                 type="text"
                 name="nextAction"
                 value={formData.nextAction}
                 onChange={handleChange}
                 placeholder="e.g. Schedule Class 3"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Follow-up Date</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Follow-up Date</label>
               <input
                 type="date"
                 name="followUpDate"
                 value={formData.followUpDate}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Test Date</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Test Date</label>
               <input
                 type="date"
                 name="testDate"
                 value={formData.testDate}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Test Status</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Test Status</label>
               <select
                 name="testStatus"
                 value={formData.testStatus}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                className={inputStyles}
               >
                 <option value="Not Scheduled">Not Scheduled</option>
                 <option value="Scheduled">Scheduled</option>
@@ -436,57 +438,57 @@ const StudentFormPage = () => {
         </div>
 
         {/* SECTION 4: Fee Details & Dynamic Balance */}
-        <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-bold text-slate-800 text-base border-b border-slate-100 pb-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base border-b border-slate-100 dark:border-slate-700 pb-2">
             4. Fee Details & Dynamic Balance
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Total Fee (₹)</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Total Fee (₹)</label>
               <input
                 type="number"
                 name="totalFee"
                 min="0"
                 value={formData.totalFee}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                className={`${inputStyles} font-bold`}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Paid Amount (₹)</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Paid Amount (₹)</label>
               <input
                 type="number"
                 name="paidAmount"
                 min="0"
                 value={formData.paidAmount}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-semibold text-emerald-700 focus:ring-2 focus:ring-indigo-500"
+                className={`${inputStyles} font-bold text-emerald-600 dark:text-emerald-400`}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Advance Amount (₹)</label>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Advance Amount (₹)</label>
               <input
                 type="number"
                 name="advanceAmount"
                 min="0"
                 value={formData.advanceAmount}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-semibold text-blue-700 focus:ring-2 focus:ring-indigo-500"
+                className={`${inputStyles} font-bold text-blue-600 dark:text-blue-400`}
               />
             </div>
-            <div className="bg-slate-50 p-3 rounded-md border border-slate-200 flex flex-col justify-center">
-              <span className="text-xs font-semibold text-slate-500">Calculated Balance</span>
-              <span className={`text-lg font-bold ${calculatedBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-md border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Calculated Balance</span>
+              <span className={`text-lg font-bold ${calculatedBalance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                 ₹ {calculatedBalance}
               </span>
-              <span className="text-[10px] text-slate-400">Total Fee - Paid - Advance</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500">Total Fee - Paid - Advance</span>
             </div>
           </div>
         </div>
 
         {/* SECTION 5: Document / Form Readiness */}
-        <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-bold text-slate-800 text-base border-b border-slate-100 pb-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base border-b border-slate-100 dark:border-slate-700 pb-2">
             5. Document & Verification Checkboxes
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -497,23 +499,23 @@ const StudentFormPage = () => {
               { id: 'doc_bloodGroupRecorded', label: 'Blood Group Recorded' },
               { id: 'doc_form15Ready', label: 'Form 15 Ready' }
             ].map(item => (
-              <label key={item.id} className="flex items-center gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 cursor-pointer text-sm">
+              <label key={item.id} className="flex items-center gap-2.5 p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700/50 cursor-pointer text-sm transition">
                 <input
                   type="checkbox"
                   name={item.id}
                   checked={Boolean(formData.documentReadiness?.[item.id.replace('doc_', '')])}
                   onChange={handleChange}
-                  className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                  className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
                 />
-                <span className="text-slate-700 font-medium">{item.label}</span>
+                <span className="text-slate-700 dark:text-slate-200 font-medium">{item.label}</span>
               </label>
             ))}
           </div>
         </div>
 
         {/* SECTION 6: Notes */}
-        <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
-          <h3 className="font-bold text-slate-800 text-base border-b border-slate-100 pb-2">
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+          <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base border-b border-slate-100 dark:border-slate-700 pb-2">
             6. Additional Notes
           </h3>
           <textarea
@@ -522,7 +524,7 @@ const StudentFormPage = () => {
             value={formData.notes}
             onChange={handleChange}
             placeholder="Enter any additional remarks, special requests, or progress notes..."
-            className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+            className={inputStyles}
           ></textarea>
         </div>
 
@@ -530,7 +532,7 @@ const StudentFormPage = () => {
           <button
             type="button"
             onClick={() => navigate('/students')}
-            className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-md transition"
+            className="px-5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-md transition"
           >
             Cancel
           </button>

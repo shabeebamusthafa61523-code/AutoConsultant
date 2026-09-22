@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import {
   LayoutDashboard,
   Users,
@@ -11,12 +12,15 @@ import {
   UserCheck,
   ChevronLeft,
   ChevronRight,
-  LogOut
+  LogOut,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { user, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
 
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -30,7 +34,7 @@ const Sidebar = () => {
 
   return (
     <aside
-      className={`relative bg-white border-r border-slate-200 min-h-screen flex flex-col shrink-0 transition-all duration-300 ease-in-out shadow-sm ${
+      className={`relative bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 min-h-screen flex flex-col shrink-0 transition-all duration-300 ease-in-out shadow-sm ${
         isCollapsed ? 'w-20' : 'w-64'
       }`}
     >
@@ -38,13 +42,13 @@ const Sidebar = () => {
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-        className="absolute -right-3 top-6 bg-white border border-slate-300 shadow-md text-slate-700 hover:text-red-600 hover:border-red-500 p-1 rounded-full transition-all z-20"
+        className="absolute -right-3 top-6 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 shadow-md text-slate-700 dark:text-slate-200 hover:text-red-600 dark:hover:text-red-400 p-1 rounded-full transition-all z-20"
       >
         {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
 
-      {/* BENZ Logo Header */}
-      <div className="p-4 border-b border-slate-200 flex items-center justify-center">
+      {/* BENZ Logo Header (Image Only) */}
+      <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-center">
         <img
           src="/logo.png"
           alt="BENZ Driving School"
@@ -67,8 +71,8 @@ const Sidebar = () => {
                   isCollapsed ? 'justify-center' : ''
                 } ${
                   isActive
-                    ? 'bg-red-50 text-red-600 font-bold border-l-4 border-red-600 shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-bold border-l-4 border-red-600 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
                 }`
               }
             >
@@ -79,18 +83,32 @@ const Sidebar = () => {
         })}
       </nav>
 
-      {/* User Info & Logout Button at Sidebar Bottom */}
-      <div className="p-3 border-t border-slate-200 bg-slate-50/80 space-y-2">
+      {/* User Info & Actions at Sidebar Bottom */}
+      <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40 space-y-2">
         {!isCollapsed && user && (
           <div className="px-2 py-1 text-xs">
-            <p className="font-bold text-slate-900 truncate">{user.name || 'User'}</p>
+            <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{user.name || 'User'}</p>
             <p className="text-[10px] text-red-600 font-bold uppercase">{user.role || 'Superadmin'}</p>
           </div>
         )}
+
+        {/* Sidebar Dark Mode Toggle */}
+        <button
+          onClick={toggleTheme}
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          className={`w-full flex items-center gap-2.5 px-3.5 py-2 rounded-md text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition ${
+            isCollapsed ? 'justify-center' : ''
+          }`}
+        >
+          {isDark ? <Sun size={16} className="text-amber-400 shrink-0" /> : <Moon size={16} className="text-slate-600 shrink-0" />}
+          {!isCollapsed && <span>{isDark ? 'Light Theme' : 'Dark Theme'}</span>}
+        </button>
+
+        {/* Logout Button */}
         <button
           onClick={logout}
           title="Sign Out of BENZ Portal"
-          className={`w-full flex items-center gap-2.5 px-3.5 py-2 rounded-md text-xs font-bold text-slate-700 hover:text-red-700 hover:bg-red-50 border border-slate-200 hover:border-red-200 transition ${
+          className={`w-full flex items-center gap-2.5 px-3.5 py-2 rounded-md text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 border border-slate-200 dark:border-slate-700 transition ${
             isCollapsed ? 'justify-center' : ''
           }`}
         >
