@@ -9,11 +9,13 @@ import Modal from '../../components/Modal';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import { getClasses, createClass, updateClass, deleteClass } from '../../services/classService';
 import { getStudents } from '../../services/studentService';
+import { getUsers } from '../../services/userService';
 import { Plus, Edit, Trash2, Calendar } from 'lucide-react';
 
 const ClassListPage = () => {
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -28,7 +30,7 @@ const ClassListPage = () => {
   const [formData, setFormData] = useState({
     student: '',
     classDate: new Date().toISOString().split('T')[0],
-    instructor: 'Instructor',
+    instructor: '',
     vehicleNo: 'KL-01-AB-1234',
     trainingType: 'Practical Driving',
     km: 10,
@@ -48,13 +50,17 @@ const ClassListPage = () => {
       if (selectedStudent) params.student = selectedStudent;
       if (filterDate) params.date = filterDate;
 
-      const [classRes, stuRes] = await Promise.all([
+      const [classRes, stuRes, userRes] = await Promise.all([
         getClasses(params),
-        getStudents()
+        getStudents(),
+        getUsers()
       ]);
 
       setClasses(classRes || []);
       setStudents(stuRes || []);
+      // Filter out Superadmin accounts for instructor list as requested
+      const eligibleInstructors = (userRes || []).filter(u => u.role !== 'Superadmin');
+      setInstructors(eligibleInstructors);
     } catch (err) {
       setError(err.message || 'Failed to fetch class records.');
     } finally {
@@ -71,7 +77,7 @@ const ClassListPage = () => {
     setFormData({
       student: students[0]?._id || '',
       classDate: new Date().toISOString().split('T')[0],
-      instructor: 'Instructor',
+      instructor: instructors[0]?.name || 'Instructor',
       vehicleNo: 'KL-01-AB-1234',
       trainingType: 'Practical Driving',
       km: 10,
@@ -286,14 +292,20 @@ const ClassListPage = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Instructor</label>
-              <input
-                type="text"
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Instructor *</label>
+              <select
+                required
                 value={formData.instructor}
                 onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
-                placeholder="Instructor Name"
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
-              />
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white text-slate-800"
+              >
+                <option value="">-- Select Instructor --</option>
+                {instructors.map((u) => (
+                  <option key={u._id} value={u.name}>
+                    {u.name} ({u.role})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

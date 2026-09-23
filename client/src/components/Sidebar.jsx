@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import {
   LayoutDashboard,
   Users,
@@ -9,18 +8,16 @@ import {
   CalendarCheck,
   HelpCircle,
   CreditCard,
+  Receipt,
   UserCheck,
   ChevronLeft,
   ChevronRight,
-  LogOut,
-  Sun,
-  Moon
+  LogOut
 } from 'lucide-react';
 
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { user, logout } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
 
   const navItems = [
     { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -29,6 +26,7 @@ const Sidebar = () => {
     { label: 'Classes', path: '/classes', icon: CalendarCheck },
     { label: 'Enquiries', path: '/enquiries', icon: HelpCircle },
     { label: 'Payments', path: '/payments', icon: CreditCard },
+    { label: 'Course Fee', path: '/course-fees', icon: Receipt },
     { label: 'Users', path: '/users', icon: UserCheck }
   ];
 
@@ -91,18 +89,6 @@ const Sidebar = () => {
             <p className="text-[10px] text-red-600 font-bold uppercase">{user.role || 'Superadmin'}</p>
           </div>
         )}
-
-        {/* Sidebar Dark Mode Toggle */}
-        <button
-          onClick={toggleTheme}
-          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          className={`w-full flex items-center gap-2.5 px-3.5 py-2 rounded-md text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition ${
-            isCollapsed ? 'justify-center' : ''
-          }`}
-        >
-          {isDark ? <Sun size={16} className="text-amber-400 shrink-0" /> : <Moon size={16} className="text-slate-600 shrink-0" />}
-          {!isCollapsed && <span>{isDark ? 'Light Theme' : 'Dark Theme'}</span>}
-        </button>
 
         {/* Logout Button */}
         <button
