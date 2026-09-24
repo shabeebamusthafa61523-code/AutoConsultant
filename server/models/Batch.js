@@ -32,6 +32,11 @@ const batchSchema = new mongoose.Schema(
       trim: true,
       default: 'Unassigned'
     },
+    instructorRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Instructor',
+      default: null
+    },
     secondaryInstructor: {
       type: String,
       trim: true
@@ -39,6 +44,11 @@ const batchSchema = new mongoose.Schema(
     vehicleNo: {
       type: String,
       trim: true
+    },
+    vehicleRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vehicle',
+      default: null
     },
     meetingPoint: {
       type: String,

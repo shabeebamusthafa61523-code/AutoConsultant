@@ -3,6 +3,7 @@ const Batch = require('../models/Batch');
 const Class = require('../models/Class');
 const Payment = require('../models/Payment');
 const Attendance = require('../models/Attendance');
+const StudentDocument = require('../models/StudentDocument');
 const generateStudentId = require('../utils/generateStudentId');
 
 // Helper to sanitize Indian mobile numbers
@@ -275,10 +276,11 @@ const getStudentDetails = async (req, res, next) => {
       throw new Error('Student not found');
     }
 
-    const [classes, payments, attendances] = await Promise.all([
+    const [classes, payments, attendances, documents] = await Promise.all([
       Class.find({ student: student._id }).sort({ classDate: -1 }),
       Payment.find({ student: student._id }).sort({ paymentDate: -1 }),
-      Attendance.find({ student: student._id }).sort({ date: -1 })
+      Attendance.find({ student: student._id }).sort({ date: -1 }),
+      StudentDocument.find({ student: student._id }).populate('verifiedBy', 'name role').sort({ createdAt: -1 })
     ]);
 
     // Financial calculations
@@ -336,7 +338,8 @@ const getStudentDetails = async (req, res, next) => {
         paymentsLoggedSum: totalPaymentsReceived,
         balance,
         feeStatus: student.feeStatus
-      }
+      },
+      documents: documents || []
     });
   } catch (error) {
     next(error);

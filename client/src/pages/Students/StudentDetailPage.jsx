@@ -481,7 +481,7 @@ const StudentDetailPage = () => {
               <div className="bg-white dark:bg-slate-800 p-5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
                 <h3 className="font-extrabold text-slate-800 dark:text-slate-200 text-sm flex items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-3">
                   <FileText size={16} className="text-red-600" />
-                  Compliance Checklist
+                  Document Readiness Checklist
                 </h3>
                 <div className="grid grid-cols-1 gap-2 text-xs">
                   {[

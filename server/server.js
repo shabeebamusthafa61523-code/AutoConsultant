@@ -18,6 +18,10 @@ const enquiryRoutes = require('./routes/enquiryRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const courseFeeRoutes = require('./routes/courseFeeRoutes');
 const userRoutes = require('./routes/userRoutes');
+const instructorRoutes = require('./routes/instructorRoutes');
+const vehicleRoutes = require('./routes/vehicleRoutes');
+const studentDocumentRoutes = require('./routes/studentDocumentRoutes');
+const complaintRoutes = require('./routes/complaintRoutes');
 
 // Connect to MongoDB Atlas
 connectDB();
@@ -31,6 +35,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded documents securely
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health Check Route
 app.get('/api/health', (req, res) => {
@@ -46,6 +53,10 @@ app.use('/api/classes', classRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/course-fees', courseFeeRoutes);
+app.use('/api/instructors', instructorRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/student-documents', studentDocumentRoutes);
+app.use('/api/complaints', complaintRoutes);
 
 // Centralized Error Handler
 app.use(errorHandler);

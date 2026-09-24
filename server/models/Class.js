@@ -17,10 +17,20 @@ const classSchema = new mongoose.Schema(
       trim: true,
       default: 'Instructor'
     },
+    instructorRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Instructor',
+      default: null
+    },
     vehicleNo: {
       type: String,
       trim: true,
       default: 'KL-01-AB-1234'
+    },
+    vehicleRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vehicle',
+      default: null
     },
     trainingType: {
       type: String,
