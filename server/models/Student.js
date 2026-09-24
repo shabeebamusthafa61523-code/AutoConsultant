@@ -59,6 +59,11 @@ const studentSchema = new mongoose.Schema(
       type: String,
       default: 'Registration'
     },
+    application: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     currentStatus: {
       type: String,
       enum: ['Active', 'Pending', 'Passed', 'Failed', 'Dropped'],
@@ -89,7 +94,7 @@ const studentSchema = new mongoose.Schema(
     },
     totalFee: {
       type: Number,
-      default: 0
+      default: 9000
     },
     paidAmount: {
       type: Number,
