@@ -16,6 +16,13 @@ import EnquiryListPage from './pages/Enquiries/EnquiryListPage';
 import PaymentListPage from './pages/Payments/PaymentListPage';
 import CourseFeeListPage from './pages/CourseFees/CourseFeeListPage';
 import UsersPage from './pages/UsersPage';
+import InstructorListPage from './pages/Instructors/InstructorListPage';
+import InstructorDetailPage from './pages/Instructors/InstructorDetailPage';
+import VehicleListPage from './pages/Vehicles/VehicleListPage';
+import VehicleDetailPage from './pages/Vehicles/VehicleDetailPage';
+import StudentDocumentListPage from './pages/StudentDocuments/StudentDocumentListPage';
+import ComplaintListPage from './pages/Complaints/ComplaintListPage';
+import ComplaintDetailPage from './pages/Complaints/ComplaintDetailPage';
 
 function App() {
   return (
@@ -41,6 +48,21 @@ function App() {
 
             {/* Class Routes */}
             <Route path="/classes" element={<ProtectedRoute><ClassListPage /></ProtectedRoute>} />
+
+            {/* Instructor Routes */}
+            <Route path="/instructors" element={<ProtectedRoute><InstructorListPage /></ProtectedRoute>} />
+            <Route path="/instructors/:id" element={<ProtectedRoute><InstructorDetailPage /></ProtectedRoute>} />
+
+            {/* Vehicle Routes */}
+            <Route path="/vehicles" element={<ProtectedRoute><VehicleListPage /></ProtectedRoute>} />
+            <Route path="/vehicles/:id" element={<ProtectedRoute><VehicleDetailPage /></ProtectedRoute>} />
+
+            {/* Student Documents Route */}
+            <Route path="/student-documents" element={<ProtectedRoute><StudentDocumentListPage /></ProtectedRoute>} />
+
+            {/* Complaints Routes */}
+            <Route path="/complaints" element={<ProtectedRoute><ComplaintListPage /></ProtectedRoute>} />
+            <Route path="/complaints/:id" element={<ProtectedRoute><ComplaintDetailPage /></ProtectedRoute>} />
 
             {/* Enquiry Routes */}
             <Route path="/enquiries" element={<ProtectedRoute><EnquiryListPage /></ProtectedRoute>} />

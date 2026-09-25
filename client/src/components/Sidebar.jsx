@@ -12,7 +12,11 @@ import {
   UserCheck,
   ChevronLeft,
   ChevronRight,
-  LogOut
+  LogOut,
+  GraduationCap,
+  Car,
+  FileCheck,
+  AlertCircle
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -24,6 +28,10 @@ const Sidebar = () => {
     { label: 'Students', path: '/students', icon: Users },
     { label: 'Batches', path: '/batches', icon: Layers },
     { label: 'Classes', path: '/classes', icon: CalendarCheck },
+    { label: 'Instructors', path: '/instructors', icon: GraduationCap },
+    { label: 'Vehicles', path: '/vehicles', icon: Car },
+    { label: 'Student Documents', path: '/student-documents', icon: FileCheck },
+    { label: 'Complaints', path: '/complaints', icon: AlertCircle },
     { label: 'Enquiries', path: '/enquiries', icon: HelpCircle },
     { label: 'Payments', path: '/payments', icon: CreditCard },
     { label: 'Course Fee', path: '/course-fees', icon: Receipt },
