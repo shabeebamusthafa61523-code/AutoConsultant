@@ -188,6 +188,12 @@ const studentSchema = new mongoose.Schema(
       bikeClassesCount: { type: Number, default: 0 },
       totalKm: { type: Number, default: 0 },
       totalHours: { type: Number, default: 0 },
+      equivalentClasses: { type: Number, default: 0 },
+      requiredClasses: { type: Number, default: 20 },
+      pendingClasses: { type: Number, default: 20 },
+      completionPercentage: { type: Number, default: 0 },
+      latestClassDate: { type: Date },
+      nextScheduledDate: { type: Date },
       theoryCompleted: { type: Boolean, default: false },
       simulatorCompleted: { type: Boolean, default: false },
       remarks: { type: String, trim: true, default: '' }

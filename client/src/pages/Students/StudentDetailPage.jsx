@@ -37,7 +37,12 @@ import {
   Activity,
   Award,
   Check,
-  X
+  X,
+  Gauge,
+  Car,
+  CheckCircle2,
+  AlertCircle,
+  Percent
 } from 'lucide-react';
 
 const StudentDetailPage = () => {
@@ -707,47 +712,220 @@ const StudentDetailPage = () => {
         {/* ========================================================================= */}
         {/* TAB 4: TRAINING & PROGRESS */}
         {/* ========================================================================= */}
-        {activeTab === 'training' && (
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 dark:border-slate-700 pb-4">
-              <div>
-                <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
-                  Practical Driving Sessions ({classes.length})
-                </h3>
-                <p className="text-xs text-slate-400">Total KM Driven: {stats.training?.totalKm || 0} KM &bull; Hours: {stats.training?.totalHours || 0} hrs</p>
-              </div>
-              <button
-                onClick={() => setClassModalOpen(true)}
-                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-md transition flex items-center gap-1.5 shadow-sm"
-              >
-                <Plus size={15} /> + Add Class
-              </button>
-            </div>
+        {activeTab === 'training' && (() => {
+          const tp = student.trainingProgress || {};
+          const trainingStats = stats.training || {};
+          const totalKm = trainingStats.totalKm || tp.totalKm || 0;
+          const totalHours = trainingStats.totalHours || tp.totalHours || 0;
+          const roadCount = trainingStats.roadCount || tp.roadClassesCount || 0;
+          const hTrackCount = trainingStats.hTrackCount || tp.hTrackClassesCount || 0;
+          const bikeCount = trainingStats.bikeCount || tp.bikeClassesCount || 0;
 
-            <DataTable
-              columns={[
-                {
-                  header: 'Date',
-                  cell: (row) => new Date(row.classDate).toLocaleDateString()
-                },
-                { header: 'Instructor', accessor: 'instructor' },
-                {
-                  header: 'Vehicle',
-                  cell: (row) => <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">{row.vehicleNo}</span>
-                },
-                {
-                  header: 'Training Type',
-                  cell: (row) => <Badge type="class" value={row.trainingType} />
-                },
-                { header: 'KM Driven', cell: (row) => `${row.km} KM` },
-                { header: 'Duration', cell: (row) => `${row.hours} hr(s)` },
-                { header: 'Notes / Remarks', accessor: 'notes' }
-              ]}
-              data={classes}
-              emptyMessage="No driving class sessions recorded yet for this student."
-            />
-          </div>
-        )}
+          // Reference Formula calculations
+          const roadEq = Math.round((totalKm / 5) * 10) / 10;
+          const hEq = Math.round((totalHours / 3) * 10) / 10;
+          const totalEq = tp.equivalentClasses !== undefined
+            ? Math.round(tp.equivalentClasses * 10) / 10
+            : Math.round(((totalKm / 5) + (totalHours / 3) + bikeCount) * 10) / 10;
+          const required = tp.requiredClasses || 20;
+          const pending = Math.max(0, Math.round((required - totalEq) * 10) / 10);
+          const completionPct = Math.min(100, Math.round((totalEq / required) * 100));
+
+          return (
+            <div className="space-y-5">
+              {/* Training Progress & Quota Analytics Summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                {/* 1. Road Training */}
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-xs font-semibold">Road Training</span>
+                    <Car size={16} className="text-blue-500" />
+                  </div>
+                  <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">
+                    {totalKm} <span className="text-xs font-normal text-slate-400">KM</span>
+                  </p>
+                  <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 mt-1">
+                    {roadEq} Eq. Classes <span className="text-slate-400 font-normal">({roadCount} sess)</span>
+                  </p>
+                </div>
+
+                {/* 2. Track / H Training */}
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-xs font-semibold">Track / H Training</span>
+                    <Clock size={16} className="text-amber-500" />
+                  </div>
+                  <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">
+                    {totalHours} <span className="text-xs font-normal text-slate-400">hrs</span>
+                  </p>
+                  <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-1">
+                    {hEq} Eq. Classes <span className="text-slate-400 font-normal">({hTrackCount} sess)</span>
+                  </p>
+                </div>
+
+                {/* 3. Bike Training */}
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-xs font-semibold">Bike Classes</span>
+                    <Award size={16} className="text-purple-500" />
+                  </div>
+                  <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">
+                    {bikeCount} <span className="text-xs font-normal text-slate-400">Classes</span>
+                  </p>
+                  <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 mt-1">
+                    2-Wheeler Practical
+                  </p>
+                </div>
+
+                {/* 4. Total Equivalent Classes */}
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-xs font-semibold">Total Equivalent</span>
+                    <CheckCircle2 size={16} className="text-emerald-500" />
+                  </div>
+                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                    {totalEq}
+                  </p>
+                  <p className="text-[10px] text-slate-400 font-mono mt-1">
+                    (KM/5) + (H/3) + Bike
+                  </p>
+                </div>
+
+                {/* 5. Pending Classes & Progress */}
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-xs font-semibold">Pending Quota</span>
+                    <Percent size={16} className="text-rose-500" />
+                  </div>
+                  <p className="text-xl font-black text-rose-600 dark:text-rose-400 mt-1">
+                    {pending} <span className="text-xs font-normal text-slate-400">/ {required} req</span>
+                  </p>
+                  <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 mt-2 overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
+                      style={{ width: `${completionPct}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 text-right font-bold">{completionPct}% Complete</p>
+                </div>
+
+                {/* 6. Side-by-Side Fee Status */}
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-xs font-semibold">Fee Status</span>
+                    <CreditCard size={16} className={feeSummary.balance <= 0 ? 'text-emerald-500' : 'text-amber-500'} />
+                  </div>
+                  <p className={`text-xl font-black mt-1 ${feeSummary.balance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    ₹ {feeSummary.balance}
+                  </p>
+                  <div className="flex items-center justify-between text-[11px] mt-1 font-medium">
+                    <span className="text-slate-400">Total: ₹{feeSummary.totalFee}</span>
+                    <span className={feeSummary.balance <= 0 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>
+                      {feeSummary.balance <= 0 ? 'Paid' : 'Due'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Driving Sessions Ledger Table */}
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-5">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 dark:border-slate-700 pb-4">
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                      <span>Practical Driving Sessions</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold">
+                        {classes.length} Logged
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Session history showing actual kilometers logged, duration hours, instructor assignment and reference equivalents.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setClassModalOpen(true)}
+                    className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-md transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Plus size={15} /> + Add Class Record
+                  </button>
+                </div>
+
+                <DataTable
+                  columns={[
+                    {
+                      header: 'Date',
+                      cell: (row) => (
+                        <span className="text-xs font-mono font-semibold text-slate-800 dark:text-slate-200">
+                          {row.classDate ? new Date(row.classDate).toLocaleDateString() : '—'}
+                        </span>
+                      )
+                    },
+                    {
+                      header: 'Instructor',
+                      accessor: 'instructor',
+                      cell: (row) => (
+                        <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                          {row.instructor || 'Unassigned'}
+                        </span>
+                      )
+                    },
+                    {
+                      header: 'Vehicle',
+                      cell: (row) => (
+                        <span className="font-mono text-xs font-bold bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-800 dark:text-slate-200">
+                          {row.vehicleNo || 'KL-10-AB-5265'}
+                        </span>
+                      )
+                    },
+                    {
+                      header: 'Training Type',
+                      cell: (row) => <Badge type="class" value={row.trainingType || 'Practical Driving'} />
+                    },
+                    {
+                      header: 'KM Driven',
+                      cell: (row) => (
+                        <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs">
+                          {row.km || 0} KM
+                        </span>
+                      )
+                    },
+                    {
+                      header: 'Duration',
+                      cell: (row) => (
+                        <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-xs">
+                          {row.hours || 0} hr(s)
+                        </span>
+                      )
+                    },
+                    {
+                      header: 'Equivalent Classes',
+                      cell: (row) => {
+                        const km = Number(row.km || 0);
+                        const h = Number(row.hours || 0);
+                        const bikes = Number(row.bikeClassCount || 0);
+                        const eq = Math.round(((km / 5) + (h / 3) + bikes) * 10) / 10;
+                        return (
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-xs">
+                            {eq} Eq
+                          </span>
+                        );
+                      }
+                    },
+                    {
+                      header: 'Notes / Remarks',
+                      cell: (row) => (
+                        <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px] block" title={row.notes || ''}>
+                          {row.notes || '—'}
+                        </span>
+                      )
+                    }
+                  ]}
+                  data={classes}
+                  emptyMessage="No driving class sessions recorded yet for this student."
+                />
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ========================================================================= */}
         {/* TAB 5: ATTENDANCE */}

@@ -328,6 +328,18 @@ const getStudentDetails = async (req, res, next) => {
           bikeCount: bikeCount || student.trainingProgress?.bikeClassesCount || 0,
           totalKm: totalKm || student.trainingProgress?.totalKm || 0,
           totalHours: totalHours || student.trainingProgress?.totalHours || 0,
+          roadEquivalent: Math.round(((totalKm || student.trainingProgress?.totalKm || 0) / 5) * 10) / 10,
+          hEquivalent: Math.round(((totalHours || student.trainingProgress?.totalHours || 0) / 3) * 10) / 10,
+          equivalentClasses: student.trainingProgress?.equivalentClasses !== undefined
+            ? student.trainingProgress.equivalentClasses
+            : Math.round(((totalKm / 5) + (totalHours / 3) + bikeCount) * 10) / 10,
+          requiredClasses: student.trainingProgress?.requiredClasses || 20,
+          pendingClasses: student.trainingProgress?.pendingClasses !== undefined
+            ? student.trainingProgress.pendingClasses
+            : Math.max(0, Math.round(((student.trainingProgress?.requiredClasses || 20) - ((totalKm / 5) + (totalHours / 3) + bikeCount)) * 10) / 10),
+          completionPercentage: student.trainingProgress?.completionPercentage !== undefined
+            ? student.trainingProgress.completionPercentage
+            : Math.min(100, Math.round((((totalKm / 5) + (totalHours / 3) + bikeCount) / (student.trainingProgress?.requiredClasses || 20)) * 100)),
           status: student.trainingProgress?.status || (classes.length > 0 ? 'In Progress' : 'Not Started')
         }
       },

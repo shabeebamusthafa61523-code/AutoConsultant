@@ -47,11 +47,126 @@ const classSchema = new mongoose.Schema(
     notes: {
       type: String,
       trim: true
+    },
+    batch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Batch',
+      default: null
+    },
+    startTime: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    endTime: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    timeSlot: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    section: {
+      type: String,
+      enum: ['Morning', 'Afternoon', 'Evening', 'General'],
+      default: 'General'
+    },
+    bikeClassCount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    hClassCount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    attendance: {
+      type: String,
+      enum: ['Present', 'Absent', 'Excused'],
+      default: 'Present'
+    },
+    scheduleRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Schedule',
+      default: null
+    },
+    status: {
+      type: String,
+      enum: ['Completed', 'Planned', 'Scheduled', 'Cancelled'],
+      default: 'Completed'
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
     }
   },
   {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
+
+// Virtual aliases for API compatibility
+classSchema.virtual('kilometers')
+  .get(function () { return this.km; })
+  .set(function (v) { this.km = v; });
+
+classSchema.virtual('date')
+  .get(function () { return this.classDate; })
+  .set(function (v) { this.classDate = v; });
+
+classSchema.virtual('type')
+  .get(function () { return this.trainingType; })
+  .set(function (v) { this.trainingType = v; });
+
+// Virtual for exact unrounded equivalent classes calculation: (Road KM / 5) + (H / 3) + Bike Classes
+classSchema.virtual('equivalentClasses').get(function () {
+  const kmPart = (this.km || 0) / 5;
+  const hPart = (this.hours || 0) / 3;
+  const bikePart = this.bikeClassCount || 0;
+  return kmPart + hPart + bikePart;
+});
+
+// Performance indexes
+classSchema.index({ student: 1, classDate: -1 });
+classSchema.index({ batch: 1, classDate: -1 });
+classSchema.index({ instructorRef: 1, classDate: -1 });
+classSchema.index({ vehicleRef: 1, classDate: -1 });
+classSchema.index({ classDate: -1 });
+classSchema.index({ status: 1, classDate: -1 });
+classSchema.index({ createdAt: -1 });
+
+// Pre-save hook to populate textual instructor/vehicle names if references are supplied
+classSchema.pre('save', async function (next) {
+  try {
+    if (this.isModified('instructorRef') && this.instructorRef) {
+      const Instructor = mongoose.model('Instructor');
+      const ins = await Instructor.findById(this.instructorRef).select('name');
+      if (ins) {
+        this.instructor = ins.name;
+      }
+    }
+    if (this.isModified('vehicleRef') && this.vehicleRef) {
+      const Vehicle = mongoose.model('Vehicle');
+      const veh = await Vehicle.findById(this.vehicleRef).select('vehicleNumber');
+      if (veh) {
+        this.vehicleNo = veh.vehicleNumber;
+      }
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = mongoose.model('Class', classSchema);
