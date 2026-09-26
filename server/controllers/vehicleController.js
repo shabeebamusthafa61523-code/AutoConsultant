@@ -85,21 +85,54 @@ const getVehicleById = async (req, res, next) => {
 
     vehicle.calculateComplianceStatuses();
 
-    // Fetch recent maintenance & fuel records
-    const [maintenance, fuel, activeBatches] = await Promise.all([
+    // Fetch recent maintenance, fuel records & training classes
+    const [maintenance, fuel, activeBatches, trainingClasses] = await Promise.all([
       VehicleMaintenance.find({ vehicle: vehicle._id }).sort({ date: -1 }).limit(10),
       VehicleFuel.find({ vehicle: vehicle._id }).sort({ date: -1 }).limit(10),
       Batch.find({
         $or: [{ vehicleRef: vehicle._id }, { vehicleNo: vehicle.vehicleNumber }],
         status: 'Active'
+      }),
+      Class.find({
+        $or: [{ vehicleRef: vehicle._id }, { vehicleNo: vehicle.vehicleNumber }]
       })
+        .populate('student', 'fullName studentId primaryMobile')
+        .populate('instructorRef', 'name')
+        .sort({ classDate: -1 })
     ]);
+
+    // Aggregate vehicle training statistics
+    let totalTrainingKm = 0;
+    let totalTrainingHours = 0;
+    const studentsSet = new Set();
+    let latestTrainingDate = null;
+
+    trainingClasses.forEach(c => {
+      totalTrainingKm += Number(c.km || 0);
+      totalTrainingHours += Number(c.hours || 0);
+      if (c.student) {
+        studentsSet.add(String(c.student._id || c.student));
+      }
+      if (c.classDate && (!latestTrainingDate || new Date(c.classDate) > new Date(latestTrainingDate))) {
+        latestTrainingDate = c.classDate;
+      }
+    });
+
+    const trainingStats = {
+      totalKm: totalTrainingKm,
+      totalHours: totalTrainingHours,
+      classesCount: trainingClasses.length,
+      studentsTrained: studentsSet.size,
+      latestTrainingDate
+    };
 
     res.json({
       vehicle,
       maintenance,
       fuel,
-      activeBatches
+      activeBatches,
+      trainingClasses,
+      trainingStats
     });
   } catch (error) {
     next(error);

@@ -32,9 +32,24 @@ const scheduleSchema = new mongoose.Schema(
       trim: true,
       default: 'Jasim'
     },
+    instructorRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Instructor',
+      default: null
+    },
     vehicleNo: {
       type: String,
       trim: true
+    },
+    vehicleRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vehicle',
+      default: null
+    },
+    section: {
+      type: String,
+      enum: ['Morning', 'Afternoon', 'Evening', 'General'],
+      default: 'General'
     },
     students: [
       {

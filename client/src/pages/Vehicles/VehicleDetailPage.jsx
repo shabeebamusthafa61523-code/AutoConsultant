@@ -21,6 +21,7 @@ import {
   Wrench,
   Fuel,
   Calendar,
+  CalendarCheck,
   AlertTriangle,
   Plus,
   Clock,
@@ -283,6 +284,63 @@ const VehicleDetailPage = () => {
     }
   ];
 
+  const trainingClasses = details.trainingClasses || [];
+  const trainingStats = details.trainingStats || {
+    totalKm: 0,
+    totalHours: 0,
+    classesCount: 0,
+    studentsTrained: 0,
+    latestTrainingDate: null
+  };
+
+  const trainingColumns = [
+    {
+      header: 'Date',
+      cell: (row) => (
+        <span className="text-xs font-semibold font-mono text-slate-700 dark:text-slate-300">
+          {row.classDate ? new Date(row.classDate).toLocaleDateString() : '—'}
+        </span>
+      )
+    },
+    {
+      header: 'Student',
+      cell: (row) => (
+        <div>
+          <p className="font-bold text-slate-800 dark:text-slate-200">
+            {row.student?.fullName || 'Student'}
+          </p>
+          <p className="text-[11px] text-slate-400 font-mono">
+            {row.student?.studentId} &bull; {row.student?.primaryMobile}
+          </p>
+        </div>
+      )
+    },
+    {
+      header: 'Instructor',
+      cell: (row) => row.instructorRef?.name || row.instructor || 'Unassigned'
+    },
+    {
+      header: 'Training Type',
+      cell: (row) => <Badge type="class" value={row.trainingType || 'Practical Driving'} />
+    },
+    {
+      header: 'KM',
+      cell: (row) => <span className="font-bold font-mono">{row.km || 0} KM</span>
+    },
+    {
+      header: 'Hours',
+      cell: (row) => <span className="font-bold font-mono">{row.hours || 0} hr(s)</span>
+    },
+    {
+      header: 'Notes',
+      cell: (row) => (
+        <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[150px] inline-block" title={row.notes}>
+          {row.notes || '—'}
+        </span>
+      )
+    }
+  ];
+
   return (
     <MainLayout>
       <Navbar title={vehicle.vehicleNumber} subtitle={`Vehicle Master & Compliance Dossier • ${vehicle.vehicleId}`} />
@@ -373,6 +431,7 @@ const VehicleDetailPage = () => {
           <div className="flex space-x-6 overflow-x-auto text-sm font-semibold">
             {[
               { id: 'compliance', label: 'Legal Compliance Registers', icon: ShieldCheck },
+              { id: 'training', label: `Training History (${trainingClasses.length})`, icon: CalendarCheck },
               { id: 'maintenance', label: `Maintenance History (${maintenance.length})`, icon: Wrench },
               { id: 'fuel', label: `Fuel Register (${fuel.length})`, icon: Fuel },
               { id: 'batches', label: `Batch Allocations (${activeBatches.length})`, icon: Calendar }
@@ -615,6 +674,54 @@ const VehicleDetailPage = () => {
                 Vehicle is not currently assigned to any active batch.
               </div>
             )}
+          </div>
+        )}
+
+        {/* TAB 5: VEHICLE TRAINING SESSIONS */}
+        {activeTab === 'training' && (
+          <div className="space-y-4">
+            {/* Top Vehicle Training Statistics Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                <span className="text-slate-400 text-xs font-semibold block">Total KM Driven</span>
+                <p className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1 font-mono">
+                  {trainingStats.totalKm} KM
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Fleet training distance</p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                <span className="text-slate-400 text-xs font-semibold block">Training Hours</span>
+                <p className="text-xl font-black text-amber-600 dark:text-amber-400 mt-1 font-mono">
+                  {trainingStats.totalHours} hrs
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Practical engine runtime</p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                <span className="text-slate-400 text-xs font-semibold block">Class Sessions</span>
+                <p className="text-xl font-black text-blue-600 dark:text-blue-400 mt-1 font-mono">
+                  {trainingStats.classesCount}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Completed lessons</p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                <span className="text-slate-400 text-xs font-semibold block">Students Trained</span>
+                <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                  {trainingStats.studentsTrained}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Latest: {trainingStats.latestTrainingDate ? new Date(trainingStats.latestTrainingDate).toLocaleDateString() : 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            <DataTable
+              columns={trainingColumns}
+              data={trainingClasses}
+              emptyMessage="No training class sessions recorded with this vehicle yet."
+            />
           </div>
         )}
       </div>
