@@ -1,6 +1,6 @@
 import React from 'react';
 
-const DataTable = ({ columns, data, keyField = '_id', emptyMessage = 'No records found' }) => {
+const DataTable = ({ columns, data, keyField = '_id', emptyMessage = 'No records found', onRowClick }) => {
   if (!data || data.length === 0) {
     return (
       <div className="bg-white dark:bg-slate-800 p-8 text-center border border-slate-200 dark:border-slate-700 rounded-lg text-slate-500 dark:text-slate-400 text-sm">
@@ -23,7 +23,17 @@ const DataTable = ({ columns, data, keyField = '_id', emptyMessage = 'No records
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 text-slate-700 dark:text-slate-200">
           {data.map((row, rowIdx) => (
-            <tr key={row[keyField] || rowIdx} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 transition">
+            <tr
+              key={row[keyField] || rowIdx}
+              onClick={(e) => {
+                if (onRowClick) {
+                  onRowClick(row, e);
+                }
+              }}
+              className={`hover:bg-slate-50/80 dark:hover:bg-slate-700/40 transition ${
+                onRowClick ? 'cursor-pointer' : ''
+              }`}
+            >
               {columns.map((col, colIdx) => (
                 <td key={colIdx} className={`px-4 py-3 align-middle ${col.className || ''}`}>
                   {col.cell ? col.cell(row) : row[col.accessor]}

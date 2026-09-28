@@ -242,30 +242,42 @@ const StudentListPage = () => {
       header: 'Actions',
       className: 'text-right',
       cell: (row) => (
-        <div className="flex items-center justify-end gap-1.5">
+        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={() => navigate(`/students/${row._id}`)}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/students/${row._id}`);
+            }}
             title="View Full Profile"
             className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded transition"
           >
             <Eye size={16} />
           </button>
           <button
-            onClick={() => navigate(`/students/${row._id}/edit`)}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/students/${row._id}/edit`);
+            }}
             title="Edit Student"
             className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded transition"
           >
             <Edit size={16} />
           </button>
           <button
-            onClick={() => setTransferTarget(row)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setTransferTarget(row);
+            }}
             title="Transfer Batch"
             className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded transition"
           >
             <ArrowRightLeft size={16} />
           </button>
           <button
-            onClick={() => setDeleteTarget(row)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteTarget(row);
+            }}
             title="Delete Student"
             className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded transition"
           >
@@ -414,6 +426,7 @@ const StudentListPage = () => {
             <DataTable
               columns={columns}
               data={students}
+              onRowClick={(row) => navigate(`/students/${row._id}`)}
               emptyMessage="No students found."
             />
             <Pagination
