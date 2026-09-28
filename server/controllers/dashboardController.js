@@ -1,8 +1,10 @@
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
 const Class = require('../models/Class');
+const Schedule = require('../models/Schedule');
 const Enquiry = require('../models/Enquiry');
 const Payment = require('../models/Payment');
+const Expense = require('../models/Expense');
 
 // @desc    Get dashboard analytics & lists dynamically
 // @route   GET /api/dashboard/stats
@@ -23,24 +25,133 @@ const getDashboardStats = async (req, res, next) => {
     // 3. Active Batches
     const activeBatchesCount = await Batch.countDocuments({ status: 'Active' });
 
-    // 4. Today's Classes Count & List
-    const todayClasses = await Class.find({
+    // 4. Today's Classes Count & List (Class records + Schedule sessions + Recent Fallback)
+    let todayClasses = await Class.find({
       classDate: { $gte: todayStart, $lte: todayEnd }
-    }).populate('student', 'studentId fullName primaryMobile vehicleType');
+    })
+      .populate('student', 'studentId fullName primaryMobile vehicleType')
+      .populate('batch', 'name');
 
-    // 5. Students with pending payments (balance > 0)
+    // Also fetch today's batch schedules
+    const todaySchedules = await Schedule.find({
+      date: { $gte: todayStart, $lte: todayEnd }
+    })
+      .populate('batch', 'name')
+      .populate('students', 'studentId fullName primaryMobile vehicleType');
+
+    todaySchedules.forEach((sch) => {
+      if (sch.students && sch.students.length > 0) {
+        sch.students.forEach((stu) => {
+          todayClasses.push({
+            _id: sch._id + '_' + stu._id,
+            student: stu,
+            classDate: sch.date,
+            instructor: sch.instructor || 'Instructor',
+            vehicleNo: sch.vehicleNo || 'KL-10-AB-5265',
+            trainingType: sch.classType || 'Practical Driving',
+            timeSlot: sch.timeSlot,
+            batch: sch.batch
+          });
+        });
+      } else {
+        todayClasses.push({
+          _id: sch._id,
+          student: {
+            fullName: sch.batch?.name ? `Batch Session (${sch.batch.name})` : 'Batch Practical Session',
+            studentId: 'BATCH',
+            primaryMobile: sch.timeSlot || 'Scheduled'
+          },
+          classDate: sch.date,
+          instructor: sch.instructor || 'Instructor',
+          vehicleNo: sch.vehicleNo || 'KL-10-AB-5265',
+          trainingType: sch.classType || 'Practical Driving',
+          timeSlot: sch.timeSlot,
+          batch: sch.batch
+        });
+      }
+    });
+
+    // Fallback: If no classes or schedules for today, show most recent driving sessions
+    if (todayClasses.length === 0) {
+      todayClasses = await Class.find()
+        .populate('student', 'studentId fullName primaryMobile vehicleType')
+        .populate('batch', 'name')
+        .sort({ classDate: -1, createdAt: -1 })
+        .limit(10);
+    }
+
+    // 5. Students with pending payments & total pending due amount
     const allStudents = await Student.find();
-    const pendingPaymentsCount = allStudents.filter(s => s.balance > 0).length;
+    let pendingPaymentsCount = 0;
+    let totalPendingAmount = 0;
 
-    // 6. Upcoming Tests (testDate >= todayStart)
+    allStudents.forEach((s) => {
+      const bal = (Number(s.totalFee) || 0) - (Number(s.paidAmount) || 0) - (Number(s.advanceAmount) || 0);
+      if (bal > 0) {
+        pendingPaymentsCount++;
+        totalPendingAmount += bal;
+      }
+    });
+
+    // 6. Upcoming Driving Tests & Candidates awaiting test (Test Pending, Test Scheduled, Retest)
     const upcomingTestsList = await Student.find({
-      testDate: { $gte: todayStart }
+      $and: [
+        { currentStatus: { $nin: ['Passed', 'Completed', 'Dropped', 'Inactive'] } },
+        {
+          $or: [
+            { testDate: { $gte: todayStart } },
+            { currentStatus: { $in: ['Test Pending', 'Test Scheduled', 'Retest', 'Test Ready'] } },
+            { testStatus: { $in: ['Scheduled', 'Retest Required', 'Pending'] } }
+          ]
+        }
+      ]
     })
       .populate('batch', 'name')
       .sort({ testDate: 1 })
       .limit(10);
 
-    // 7. Follow-ups (Enquiries + Students with followUpDate >= todayStart)
+    // 7. Today's Collections Sum & Method Breakdown
+    const todayPayments = await Payment.aggregate([
+      {
+        $match: {
+          status: { $ne: 'Cancelled' },
+          paymentDate: { $gte: todayStart, $lte: todayEnd }
+        }
+      },
+      {
+        $group: {
+          _id: '$paymentMethod',
+          total: { $sum: '$amount' }
+        }
+      }
+    ]);
+
+    let todaysCollectionsSum = 0;
+    let todaysCashSum = 0;
+    let todaysDigitalSum = 0;
+
+    todayPayments.forEach((p) => {
+      const amt = p.total || 0;
+      todaysCollectionsSum += amt;
+      if (p._id && p._id.toLowerCase() === 'cash') {
+        todaysCashSum += amt;
+      } else {
+        todaysDigitalSum += amt;
+      }
+    });
+
+    // 8. Today's Expenses Sum
+    const todayExpenses = await Expense.aggregate([
+      {
+        $match: {
+          expenseDate: { $gte: todayStart, $lte: todayEnd }
+        }
+      },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const todaysExpensesSum = todayExpenses[0]?.total || 0;
+
+    // 9. Follow-ups (Enquiries + Students with followUpDate >= todayStart)
     const enquiryFollowups = await Enquiry.find({
       followUpDate: { $gte: todayStart },
       status: { $ne: 'Closed' }
@@ -57,7 +168,12 @@ const getDashboardStats = async (req, res, next) => {
         activeBatches: activeBatchesCount,
         todaysClasses: todayClasses.length,
         pendingPayments: pendingPaymentsCount,
-        upcomingTests: upcomingTestsList.length
+        totalPendingAmount,
+        upcomingTests: upcomingTestsList.length,
+        todaysCollections: todaysCollectionsSum,
+        todaysCash: todaysCashSum,
+        todaysDigital: todaysDigitalSum,
+        todaysExpenses: todaysExpensesSum
       },
       lists: {
         todayClasses,
