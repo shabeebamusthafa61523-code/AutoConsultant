@@ -23,6 +23,9 @@ import VehicleDetailPage from './pages/Vehicles/VehicleDetailPage';
 import StudentDocumentListPage from './pages/StudentDocuments/StudentDocumentListPage';
 import ComplaintListPage from './pages/Complaints/ComplaintListPage';
 import ComplaintDetailPage from './pages/Complaints/ComplaintDetailPage';
+import StudentLedgerPage from './pages/StudentLedger/StudentLedgerPage';
+import ExpenseListPage from './pages/Expenses/ExpenseListPage';
+import DailyCollectionPage from './pages/DailyCollection/DailyCollectionPage';
 
 function App() {
   return (
@@ -69,6 +72,14 @@ function App() {
 
             {/* Payment Routes */}
             <Route path="/payments" element={<ProtectedRoute><PaymentListPage /></ProtectedRoute>} />
+            <Route path="/daily-collection" element={<ProtectedRoute><DailyCollectionPage /></ProtectedRoute>} />
+
+            {/* Expenses Routes */}
+            <Route path="/expenses" element={<ProtectedRoute><ExpenseListPage /></ProtectedRoute>} />
+
+            {/* Student Ledger Routes */}
+            <Route path="/student-ledger" element={<ProtectedRoute><StudentLedgerPage /></ProtectedRoute>} />
+            <Route path="/student-ledger/:id" element={<ProtectedRoute><StudentLedgerPage /></ProtectedRoute>} />
 
             {/* Course Fee Routes */}
             <Route path="/course-fees" element={<ProtectedRoute><CourseFeeListPage /></ProtectedRoute>} />

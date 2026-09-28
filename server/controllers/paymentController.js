@@ -17,7 +17,8 @@ const generateReceiptNo = async () => {
 
 // Helper function to recalculate student paid/advance amounts dynamically from payment records
 // Strictly follows the business logic:
-// Total Fee - Paid Amount - Advance Amount = Balance
+// Fee Payment updates totalPaid, Advance Payment updates totalAdvance.
+// Non-Fee Payment types (e.g. Exam Fee, Registration Fee) issue standalone receipts without altering tuition course fee balance.
 const updateStudentPaymentTotals = async (studentId) => {
   if (!studentId) return;
   const studentPayments = await Payment.find({
@@ -30,10 +31,10 @@ const updateStudentPaymentTotals = async (studentId) => {
 
   studentPayments.forEach((p) => {
     const amt = Number(p.amount) || 0;
-    if (p.paymentType === 'Advance Payment') {
-      totalAdvance += amt;
-    } else {
+    if (p.paymentType === 'Fee Payment') {
       totalPaid += amt;
+    } else if (p.paymentType === 'Advance Payment') {
+      totalAdvance += amt;
     }
   });
 
@@ -345,12 +346,18 @@ const createPayment = async (req, res, next) => {
     // Auto-generate atomic receipt number if not provided
     const receiptNo = req.body.receiptNo ? req.body.receiptNo.trim().toUpperCase() : await generateReceiptNo();
 
-    // Financial balance snapshot prior to payment
-    const totalFee = Number(studentRecord.totalFee) || 0;
-    const currentPaid = Number(studentRecord.paidAmount) || 0;
-    const currentAdvance = Number(studentRecord.advanceAmount) || 0;
-    const previousBalance = Math.max(0, totalFee - currentPaid - currentAdvance);
-    const balanceAfter = Math.max(0, previousBalance - parsedAmount);
+    // Financial balance snapshot prior to payment (calculated ONLY for Fee Payment and Advance Payment)
+    const isFeeRelated = !paymentType || paymentType.trim() === 'Fee Payment' || paymentType.trim() === 'Advance Payment';
+    let previousBalance = 0;
+    let balanceAfter = 0;
+
+    if (isFeeRelated) {
+      const totalFee = Number(studentRecord.totalFee) || 0;
+      const currentPaid = Number(studentRecord.paidAmount) || 0;
+      const currentAdvance = Number(studentRecord.advanceAmount) || 0;
+      previousBalance = Math.max(0, totalFee - currentPaid - currentAdvance);
+      balanceAfter = Math.max(0, previousBalance - parsedAmount);
+    }
 
     const payment = await Payment.create({
       receiptNo,

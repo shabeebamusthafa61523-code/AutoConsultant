@@ -9,6 +9,7 @@ import ErrorMessage from '../../components/ErrorMessage';
 import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
+import ReceiptModal from '../../components/ReceiptModal';
 import Badge from '../../components/Badge';
 import StatCard from '../../components/StatCard';
 import { useAuth } from '../../context/AuthContext';
@@ -41,11 +42,112 @@ import {
 } from 'lucide-react';
 
 const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Other'];
-const PAYMENT_TYPES = ['Fee Payment', 'Advance Payment', 'Registration Fee', 'Exam Fee', 'Other'];
+const DEFAULT_PAYMENT_TYPES = ['Fee Payment', 'Advance Payment', 'Registration Fee', 'Exam Fee', 'Other'];
 
 const PaymentListPage = () => {
   const { user } = useAuth();
   const canDelete = user?.role === 'Superadmin' || user?.role === 'Admin';
+
+  // Dynamic Payment Types with localStorage Persistence
+  const [paymentTypes, setPaymentTypes] = useState(() => {
+    try {
+      const saved = localStorage.getItem('benz_payment_types');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to parse payment types from localStorage', e);
+    }
+    return DEFAULT_PAYMENT_TYPES;
+  });
+
+  const savePaymentTypes = (types) => {
+    setPaymentTypes(types);
+    try {
+      localStorage.setItem('benz_payment_types', JSON.stringify(types));
+    } catch (e) {
+      console.error('Failed to save payment types', e);
+    }
+  };
+
+  // Manage Payment Types Modal State
+  const [isManageTypesOpen, setIsManageTypesOpen] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
+  const [editingTypeIndex, setEditingTypeIndex] = useState(null);
+  const [editingTypeName, setEditingTypeName] = useState('');
+  const [manageTypeError, setManageTypeError] = useState('');
+
+  const handleAddPaymentType = (e) => {
+    e?.preventDefault();
+    const trimmed = newTypeName.trim();
+    if (!trimmed) {
+      setManageTypeError('Please enter a valid payment type name.');
+      return;
+    }
+    if (paymentTypes.some((t) => t.toLowerCase() === trimmed.toLowerCase())) {
+      setManageTypeError('This payment type already exists.');
+      return;
+    }
+    const updated = [...paymentTypes, trimmed];
+    savePaymentTypes(updated);
+    setNewTypeName('');
+    setManageTypeError('');
+  };
+
+  const handleStartEditType = (index) => {
+    setEditingTypeIndex(index);
+    setEditingTypeName(paymentTypes[index]);
+    setManageTypeError('');
+  };
+
+  const handleSaveEditType = (index) => {
+    const trimmed = editingTypeName.trim();
+    if (!trimmed) {
+      setManageTypeError('Payment type name cannot be empty.');
+      return;
+    }
+    if (
+      paymentTypes.some(
+        (t, i) => i !== index && t.toLowerCase() === trimmed.toLowerCase()
+      )
+    ) {
+      setManageTypeError('Another payment type already has this name.');
+      return;
+    }
+    const oldName = paymentTypes[index];
+    const updated = [...paymentTypes];
+    updated[index] = trimmed;
+    savePaymentTypes(updated);
+
+    if (formData.paymentType === oldName) {
+      setFormData((prev) => ({ ...prev, paymentType: trimmed }));
+    }
+
+    setEditingTypeIndex(null);
+    setEditingTypeName('');
+    setManageTypeError('');
+  };
+
+  const handleDeleteType = (index) => {
+    if (paymentTypes.length <= 1) {
+      setManageTypeError('At least one payment type must remain.');
+      return;
+    }
+    const targetName = paymentTypes[index];
+    const updated = paymentTypes.filter((_, i) => i !== index);
+    savePaymentTypes(updated);
+
+    if (formData.paymentType === targetName) {
+      setFormData((prev) => ({ ...prev, paymentType: updated[0] || '' }));
+    }
+    setManageTypeError('');
+  };
+
+  const handleResetDefaultTypes = () => {
+    savePaymentTypes(DEFAULT_PAYMENT_TYPES);
+    setManageTypeError('');
+  };
 
   // Data States
   const [payments, setPayments] = useState([]);
@@ -468,7 +570,7 @@ const PaymentListPage = () => {
 
   return (
     <MainLayout>
-      <Navbar title="Payments & Fee Receipts" />
+      <Navbar title="Payment & Receipts" />
 
       <div className="space-y-5 max-w-7xl mx-auto pb-10">
         {/* ========================================================================= */}
@@ -518,6 +620,15 @@ const PaymentListPage = () => {
             >
               <Download size={15} className="text-slate-500 dark:text-slate-300" />
               <span>{exporting ? 'Exporting...' : 'Export CSV'}</span>
+            </button>
+
+            <button
+              onClick={() => window.print()}
+              title="Export / Print Payment Ledger to PDF"
+              className="px-3.5 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-md transition flex items-center gap-1.5 shadow-xs"
+            >
+              <Printer size={15} className="text-slate-500 dark:text-slate-300" />
+              <span>Export PDF</span>
             </button>
 
             <button
@@ -579,7 +690,7 @@ const PaymentListPage = () => {
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <span>Fee Receipts & Payment Ledger</span>
+                <span>Payment & Receipts Ledger</span>
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                   {pagination.total} records
                 </span>
@@ -625,18 +736,28 @@ const PaymentListPage = () => {
             </select>
 
             {/* Payment Type Filter */}
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 max-w-[160px] focus:ring-1 focus:ring-red-500"
-            >
-              <option value="">All Payment Types</option>
-              {PAYMENT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-1">
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 max-w-[160px] focus:ring-1 focus:ring-red-500"
+              >
+                <option value="">All Payment Types</option>
+                {paymentTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setIsManageTypesOpen(true)}
+                className="p-1.5 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-100 dark:hover:bg-red-900/40 transition"
+                title="Add / Edit / Delete Payment Types"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
 
             {/* Date Range: Start Date */}
             <div className="flex items-center gap-1">
@@ -837,16 +958,27 @@ const PaymentListPage = () => {
           {/* Payment Type & Method */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Payment Type <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Payment Type <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsManageTypesOpen(true)}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded hover:bg-red-100 dark:hover:bg-red-900/40 transition"
+                  title="Add / Edit / Delete Payment Types"
+                >
+                  <Plus size={12} />
+                  <span>Manage</span>
+                </button>
+              </div>
               <select
                 required
                 value={formData.paymentType}
                 onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100"
               >
-                {PAYMENT_TYPES.map((t) => (
+                {paymentTypes.map((t) => (
                   <option key={t} value={t}>
                     {t}
                   </option>
@@ -922,166 +1054,132 @@ const PaymentListPage = () => {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* INTERACTIVE PRINTABLE RECEIPT MODAL */}
+      {/* UNIFIED PRINTABLE RECEIPT MODAL */}
       {/* ========================================================================= */}
-      <Modal
+      <ReceiptModal
         isOpen={Boolean(receiptTarget)}
         onClose={() => setReceiptTarget(null)}
-        title="Official Fee Payment Receipt"
-        maxWidth="max-w-2xl"
+        payment={receiptTarget}
+      />
+
+      {/* ========================================================================= */}
+      {/* MANAGE PAYMENT TYPES MODAL */}
+      {/* ========================================================================= */}
+      <Modal
+        isOpen={isManageTypesOpen}
+        onClose={() => {
+          setIsManageTypesOpen(false);
+          setEditingTypeIndex(null);
+          setManageTypeError('');
+        }}
+        title="Manage Payment Types"
+        maxWidth="max-w-md"
       >
-        {receiptTarget && (() => {
-          const stu = receiptTarget.student || {};
-          const totalFee = Number(stu.totalFee) || 0;
-          const paidAmount = Number(receiptTarget.amount) || 0;
-          const prevBal = receiptTarget.previousBalance !== undefined
-            ? receiptTarget.previousBalance
-            : Math.max(0, totalFee - ((Number(stu.paidAmount) || 0) + (Number(stu.advanceAmount) || 0)) + paidAmount);
-          const remBal = receiptTarget.balanceAfter !== undefined
-            ? receiptTarget.balanceAfter
-            : Math.max(0, prevBal - paidAmount);
+        <div className="space-y-4 text-xs">
+          <p className="text-slate-500 dark:text-slate-400">
+            Add, edit, or remove custom payment type categories for student payment records and receipts.
+          </p>
 
-          return (
-            <div className="space-y-4">
-              {/* Printable Receipt Paper Container */}
-              <div
-                ref={receiptPrintRef}
-                className="bg-white text-slate-900 p-6 rounded-lg border border-slate-200 shadow-xs space-y-4 font-sans print:p-0 print:border-none print:shadow-none"
-              >
-                {/* Organization Header */}
-                <div className="border-b-2 border-slate-800 pb-3 flex justify-between items-start">
-                  <div>
-                    <h2 className="text-lg font-black tracking-tight text-slate-900 uppercase">
-                      RAZAIN-BENZ AUTO CONSULTANT
-                    </h2>
-                    <p className="text-xs text-slate-600 font-medium">
-                      Government Approved Motor Driving School & RTO Consultancy
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      Malappuram, Kerala &bull; Phone: +91 62828 92320 / 62384 54540
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 border border-slate-300 block">
-                      RECEIPT
-                    </span>
-                    <span className="font-mono text-sm font-black text-red-600 block mt-1">
-                      {receiptTarget.receiptNo || receiptTarget.paymentId || `REC-${String(receiptTarget._id).slice(-4).toUpperCase()}`}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Candidate & Transaction Meta Grid */}
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Candidate Details</span>
-                    <p className="font-bold text-sm text-slate-900">{stu.fullName || 'Student'}</p>
-                    <p className="font-mono text-slate-600">ID: {stu.studentId || '—'}</p>
-                    <p className="text-slate-600">Mobile: {stu.primaryMobile || '—'}</p>
-                    <p className="text-slate-600">Course: {stu.coursePackage || stu.vehicleType || 'LMV Fresh Licence'}</p>
-                  </div>
-
-                  <div className="space-y-1 text-right">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Transaction Details</span>
-                    <p className="font-semibold text-slate-700">
-                      Date: <strong className="font-mono">{receiptTarget.paymentDate ? new Date(receiptTarget.paymentDate).toLocaleDateString() : '—'}</strong>
-                    </p>
-                    <p className="text-slate-600">Payment Mode: <strong className="font-semibold">{receiptTarget.paymentMethod || 'Cash'}</strong></p>
-                    <p className="text-slate-600">Type: <strong className="font-semibold">{receiptTarget.paymentType || 'Fee Payment'}</strong></p>
-                    {receiptTarget.reference && (
-                      <p className="font-mono text-[11px] text-slate-500">Ref: {receiptTarget.reference}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Financial Ledger Breakdown Table */}
-                <div className="border border-slate-200 rounded-md overflow-hidden text-xs">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase text-[10px]">
-                        <th className="p-2.5">Description</th>
-                        <th className="p-2.5 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      <tr>
-                        <td className="p-2.5 text-slate-600">Total Enrolled Course Fee</td>
-                        <td className="p-2.5 text-right font-mono font-semibold">₹ {totalFee}</td>
-                      </tr>
-                      <tr>
-                        <td className="p-2.5 text-slate-600">Previous Outstanding Balance</td>
-                        <td className="p-2.5 text-right font-mono font-semibold">₹ {prevBal}</td>
-                      </tr>
-                      <tr className="bg-emerald-50/60 font-bold text-slate-900">
-                        <td className="p-2.5 text-emerald-800">
-                          Amount Paid Now ({receiptTarget.paymentType || 'Fee Receipt'})
-                        </td>
-                        <td className="p-2.5 text-right font-mono text-base text-emerald-700 font-black">
-                          ₹ {paidAmount}
-                        </td>
-                      </tr>
-                      <tr className="bg-slate-50 font-bold">
-                        <td className="p-2.5 text-slate-800">Remaining Balance Due</td>
-                        <td className={`p-2.5 text-right font-mono text-sm font-black ${remBal > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          ₹ {remBal}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Notes & Acknowledgement */}
-                {receiptTarget.notes && (
-                  <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
-                    <strong>Remarks:</strong> {receiptTarget.notes}
-                  </p>
-                )}
-
-                {/* Footer Signatures */}
-                <div className="pt-6 flex justify-between items-end text-xs text-slate-500">
-                  <div>
-                    <p className="text-[10px] text-slate-400">Collected By:</p>
-                    <p className="font-bold text-slate-800">{receiptTarget.recordedBy?.name || 'Authorized Staff'}</p>
-                    <p className="text-[10px] text-slate-400">RAZAIN-BENZ AUTO CONSULTANT</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="border-t border-slate-300 w-36 mb-1"></div>
-                    <p className="text-[10px] text-slate-500">Authorized Signature</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-between items-center pt-2">
-                <Link
-                  to={`/students/${stu._id}`}
-                  className="text-xs font-bold text-slate-600 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 flex items-center gap-1"
-                >
-                  <ExternalLink size={14} />
-                  <span>View Student Full Profile</span>
-                </Link>
-
-                <div className="flex gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setReceiptTarget(null)}
-                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 transition"
-                  >
-                    Close
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handlePrintReceipt}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-md transition flex items-center gap-1.5 shadow-sm"
-                  >
-                    <Printer size={15} />
-                    <span>Print Receipt</span>
-                  </button>
-                </div>
-              </div>
+          {manageTypeError && (
+            <div className="p-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded text-red-600 dark:text-red-400 text-xs font-semibold">
+              {manageTypeError}
             </div>
-          );
-        })()}
+          )}
+
+          {/* Add New Type Input */}
+          <form onSubmit={handleAddPaymentType} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Enter new payment type name..."
+              value={newTypeName}
+              onChange={(e) => setNewTypeName(e.target.value)}
+              className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-red-500 text-xs"
+            />
+            <button
+              type="submit"
+              className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-md flex items-center gap-1 shadow-xs transition"
+            >
+              <Plus size={14} />
+              <span>Add</span>
+            </button>
+          </form>
+
+          {/* Existing Types List */}
+          <div className="border border-slate-200 dark:border-slate-700 rounded-md divide-y divide-slate-200 dark:divide-slate-700 max-h-60 overflow-y-auto">
+            {paymentTypes.map((type, idx) => (
+              <div key={idx} className="p-2.5 flex items-center justify-between gap-2 bg-white dark:bg-slate-800">
+                {editingTypeIndex === idx ? (
+                  <div className="flex flex-1 items-center gap-2">
+                    <input
+                      type="text"
+                      value={editingTypeName}
+                      onChange={(e) => setEditingTypeName(e.target.value)}
+                      className="flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs focus:ring-1 focus:ring-red-500"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEditType(idx)}
+                      className="px-2.5 py-1 bg-emerald-600 text-white font-bold rounded text-[11px] hover:bg-emerald-700 transition"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTypeIndex(null)}
+                      className="px-2 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded text-[11px] hover:bg-slate-300 dark:hover:bg-slate-600 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{type}</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditType(idx)}
+                        className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded transition"
+                        title="Rename Payment Type"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteType(idx)}
+                        className="p-1 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded transition"
+                        title="Delete Payment Type"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-between items-center pt-2">
+            <button
+              type="button"
+              onClick={handleResetDefaultTypes}
+              className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline"
+            >
+              Reset to default types
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsManageTypesOpen(false);
+                setEditingTypeIndex(null);
+                setManageTypeError('');
+              }}
+              className="px-4 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold rounded-md text-xs transition"
+            >
+              Done
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* ========================================================================= */}

@@ -16,26 +16,51 @@ import {
   GraduationCap,
   Car,
   FileCheck,
-  AlertCircle
+  AlertCircle,
+  BookOpen,
+  TrendingDown
 } from 'lucide-react';
 
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { user, logout } = useAuth();
 
-  const navItems = [
-    { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { label: 'Students', path: '/students', icon: Users },
-    { label: 'Batches', path: '/batches', icon: Layers },
-    { label: 'Classes', path: '/classes', icon: CalendarCheck },
-    { label: 'Instructors', path: '/instructors', icon: GraduationCap },
-    { label: 'Vehicles', path: '/vehicles', icon: Car },
-    { label: 'Student Documents', path: '/student-documents', icon: FileCheck },
-    { label: 'Complaints', path: '/complaints', icon: AlertCircle },
-    { label: 'Enquiries', path: '/enquiries', icon: HelpCircle },
-    { label: 'Payments', path: '/payments', icon: CreditCard },
-    { label: 'Course Fee', path: '/course-fees', icon: Receipt },
-    { label: 'Users', path: '/users', icon: UserCheck }
+  const navSections = [
+    {
+      title: 'MAIN NAVIGATION',
+      items: [
+        { label: 'Dashboard', path: '/', icon: LayoutDashboard },
+        { label: 'Students', path: '/students', icon: Users },
+        { label: 'Enquiries', path: '/enquiries', icon: HelpCircle }
+      ]
+    },
+    {
+      title: 'FINANCIALS & LEDGER',
+      items: [
+        { label: 'Payment & Receipts', path: '/payments', icon: CreditCard },
+        { label: 'Student Ledger', path: '/student-ledger', icon: BookOpen },
+        { label: 'Daily Collection', path: '/daily-collection', icon: CalendarCheck },
+        { label: 'Expenses', path: '/expenses', icon: TrendingDown },
+        { label: 'Course Fee', path: '/course-fees', icon: Receipt }
+      ]
+    },
+    {
+      title: 'TRAINING & FLEET',
+      items: [
+        { label: 'Batches', path: '/batches', icon: Layers },
+        { label: 'Classes', path: '/classes', icon: CalendarCheck },
+        { label: 'Instructors', path: '/instructors', icon: GraduationCap },
+        { label: 'Vehicles', path: '/vehicles', icon: Car }
+      ]
+    },
+    {
+      title: 'RECORDS & ADMIN',
+      items: [
+        { label: 'Student Documents', path: '/student-documents', icon: FileCheck },
+        { label: 'Complaints', path: '/complaints', icon: AlertCircle },
+        { label: 'Users', path: '/users', icon: UserCheck }
+      ]
+    }
   ];
 
   return (
@@ -62,31 +87,43 @@ const Sidebar = () => {
         />
       </div>
 
-      {/* Navigation Menu */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.path === '/'}
-              title={isCollapsed ? item.label : undefined}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3.5 py-2.5 rounded-md text-sm font-medium transition ${
-                  isCollapsed ? 'justify-center' : ''
-                } ${
-                  isActive
-                    ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-bold border-l-4 border-red-600 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
-                }`
-              }
-            >
-              <Icon size={20} className="shrink-0" />
-              {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">{item.label}</span>}
-            </NavLink>
-          );
-        })}
+      {/* Categorized Navigation Menu */}
+      <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+        {navSections.map((section, idx) => (
+          <div key={idx} className="space-y-1">
+            {!isCollapsed ? (
+              <h4 className="px-3.5 pt-2 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                {section.title}
+              </h4>
+            ) : (
+              idx > 0 && <div className="my-2 border-t border-slate-100 dark:border-slate-700/60" />
+            )}
+
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === '/'}
+                  title={isCollapsed ? item.label : undefined}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3.5 py-2 rounded-md text-xs font-semibold transition ${
+                      isCollapsed ? 'justify-center' : ''
+                    } ${
+                      isActive
+                        ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-bold border-l-4 border-red-600 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
+                    }`
+                  }
+                >
+                  <Icon size={18} className="shrink-0" />
+                  {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">{item.label}</span>}
+                </NavLink>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* User Info & Actions at Sidebar Bottom */}
