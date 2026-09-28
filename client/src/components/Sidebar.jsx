@@ -65,7 +65,7 @@ const Sidebar = () => {
 
   return (
     <aside
-      className={`relative bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 min-h-screen flex flex-col shrink-0 transition-all duration-300 ease-in-out shadow-sm ${
+      className={`sticky top-0 h-screen bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col shrink-0 transition-all duration-300 ease-in-out shadow-sm ${
         isCollapsed ? 'w-20' : 'w-64'
       }`}
     >
@@ -79,7 +79,7 @@ const Sidebar = () => {
       </button>
 
       {/* BENZ Logo Header (Image Only) */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-center">
+      <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0">
         <img
           src="/logo.png"
           alt="BENZ Driving School"
@@ -87,8 +87,8 @@ const Sidebar = () => {
         />
       </div>
 
-      {/* Categorized Navigation Menu */}
-      <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+      {/* Categorized Navigation Menu - Hidden Scrollbar */}
+      <nav className="flex-1 p-3 space-y-4 overflow-y-auto no-scrollbar min-h-0">
         {navSections.map((section, idx) => (
           <div key={idx} className="space-y-1">
             {!isCollapsed ? (
@@ -127,7 +127,7 @@ const Sidebar = () => {
       </nav>
 
       {/* User Info & Actions at Sidebar Bottom */}
-      <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40 space-y-2">
+      <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40 space-y-2 shrink-0">
         {!isCollapsed && user && (
           <div className="px-2 py-1 text-xs">
             <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{user.name || 'User'}</p>
