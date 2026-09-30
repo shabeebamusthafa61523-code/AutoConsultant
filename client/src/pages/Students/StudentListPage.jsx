@@ -10,6 +10,7 @@ import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import TransferStudentModal from '../../components/TransferStudentModal';
 import Pagination from '../../components/Pagination';
 import Badge from '../../components/Badge';
+import BulkIntakeTab from './BulkIntakeTab';
 import { getStudents, deleteStudent, transferStudentBatch } from '../../services/studentService';
 import { getBatches } from '../../services/batchService';
 import {
@@ -22,11 +23,14 @@ import {
   Calendar,
   Phone,
   Filter,
-  RotateCcw
+  RotateCcw,
+  FileSpreadsheet,
+  Users
 } from 'lucide-react';
 
 const StudentListPage = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('directory'); // 'directory' | 'bulk'
   const [students, setStudents] = useState([]);
   const [batches, setBatches] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalPages: 1 });
@@ -293,147 +297,202 @@ const StudentListPage = () => {
       <Navbar title="BENZ Student Directory" />
 
       <div className="space-y-4 max-w-7xl mx-auto pb-10">
-        {/* Search, Filter Bar & Actions */}
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-            {/* Search Input */}
-            <form onSubmit={handleSearchSubmit} className="flex flex-1 items-center gap-2">
-              <div className="relative flex-1 max-w-lg">
-                <Search className="absolute left-3 top-2.5 text-slate-400" size={17} />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by Student ID, Name, Mobile, Application No..."
-                  className="w-full pl-9 pr-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              </div>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 text-xs font-bold rounded-md transition"
-              >
-                Search
-              </button>
-              {(search || selectedBatch || selectedStatus || selectedFeeStatus || selectedCourse) && (
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  title="Reset all filters"
-                  className="p-2 text-slate-500 hover:text-red-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition"
-                >
-                  <RotateCcw size={16} />
-                </button>
-              )}
-            </form>
-
-            {/* Primary Action Button */}
-            <Link
-              to="/students/add"
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-md transition flex items-center justify-center gap-1.5 shrink-0 shadow-sm"
-            >
-              <Plus size={16} />
-              Add Student
-            </Link>
-          </div>
-
-          {/* Quick Filters Row */}
-          <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-700/60 text-xs">
-            <span className="text-slate-400 font-semibold flex items-center gap-1">
-              <Filter size={13} /> Filters:
-            </span>
-
-            {/* Batch Filter */}
-            <select
-              value={selectedBatch}
-              onChange={(e) => setSelectedBatch(e.target.value)}
-              className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:ring-2 focus:ring-red-500"
-            >
-              <option value="">All Batches</option>
-              <option value="unassigned">Unassigned Only</option>
-              {batches.map((b) => (
-                <option key={b._id} value={b._id}>{b.name}</option>
-              ))}
-            </select>
-
-            {/* Status Filter */}
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:ring-2 focus:ring-red-500"
-            >
-              <option value="">All Student Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Training">Training</option>
-              <option value="Test Pending">Test Pending</option>
-              <option value="Test Scheduled">Test Scheduled</option>
-              <option value="Passed">Passed</option>
-              <option value="Completed">Completed</option>
-              <option value="Retest">Retest</option>
-              <option value="Pending">Pending</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-
-            {/* Fee Status Filter */}
-            <select
-              value={selectedFeeStatus}
-              onChange={(e) => setSelectedFeeStatus(e.target.value)}
-              className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:ring-2 focus:ring-red-500"
-            >
-              <option value="">All Fee Statuses</option>
-              <option value="Paid">Fully Paid</option>
-              <option value="Partially Paid">Partially Paid</option>
-              <option value="Pending">Payment Pending</option>
-            </select>
-
-            {/* Sort Order */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium ml-auto"
-            >
-              <option value="createdAt">Sort: Recent Admission</option>
-              <option value="fullName">Sort: Student Name</option>
-              <option value="studentId">Sort: Student ID</option>
-            </select>
-          </div>
+        {/* TOP TAB SWITCHER (STUDENT DIRECTORY vs BULK INTAKE) */}
+        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-700 pb-2 text-xs font-bold">
+          <button
+            onClick={() => setActiveTab('directory')}
+            className={`px-4 py-2.5 rounded-md transition flex items-center gap-2 ${
+              activeTab === 'directory'
+                ? 'bg-red-600 text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <Users size={16} />
+            <span>Student Directory ({pagination.total || students.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('bulk')}
+            className={`px-4 py-2.5 rounded-md transition flex items-center gap-2 ${
+              activeTab === 'bulk'
+                ? 'bg-red-600 text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <FileSpreadsheet size={16} />
+            <span>Bulk Intake (Excel / CSV)</span>
+          </button>
         </div>
 
-        {/* Content Area */}
-        {loading ? (
-          <LoadingSpinner message="Fetching students from MongoDB..." />
-        ) : error ? (
-          <ErrorMessage message={error} onRetry={() => fetchStudentsData(pagination.page)} />
-        ) : students.length === 0 ? (
-          <EmptyState
-            title="No students found"
-            description={
-              search || selectedBatch || selectedStatus || selectedFeeStatus
-                ? "No students match your active filter criteria."
-                : "There are currently no student records in the CRM database."
-            }
-            actionButton={
-              <Link
-                to="/students/add"
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-md transition inline-flex items-center gap-1.5"
-              >
-                <Plus size={16} />
-                + Add Student
-              </Link>
-            }
+        {activeTab === 'bulk' ? (
+          <BulkIntakeTab
+            batches={batches}
+            onImportSuccess={() => {
+              fetchStudentsData(1);
+            }}
           />
         ) : (
-          <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-            <DataTable
-              columns={columns}
-              data={students}
-              onRowClick={(row) => navigate(`/students/${row._id}`)}
-              emptyMessage="No students found."
-            />
-            <Pagination
-              pagination={pagination}
-              onPageChange={handlePageChange}
-            />
-          </div>
+          <>
+            {/* Search, Filter Bar & Actions */}
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+                {/* Search Input */}
+                <form onSubmit={handleSearchSubmit} className="flex flex-1 items-center gap-2">
+                  <div className="relative flex-1 max-w-lg">
+                    <Search className="absolute left-3 top-2.5 text-slate-400" size={17} />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search by Student ID, Name, Mobile, Application No..."
+                      className="w-full pl-9 pr-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 text-xs font-bold rounded-md transition"
+                  >
+                    Search
+                  </button>
+                  {(search || selectedBatch || selectedStatus || selectedFeeStatus || selectedCourse) && (
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      title="Reset all filters"
+                      className="p-2 text-slate-500 hover:text-red-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    >
+                      <RotateCcw size={16} />
+                    </button>
+                  )}
+                </form>
+
+                {/* Primary Action Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setActiveTab('bulk')}
+                    className="px-3.5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 font-bold text-xs rounded-md transition flex items-center gap-1.5 border border-slate-300 dark:border-slate-600 shadow-xs"
+                  >
+                    <FileSpreadsheet size={16} className="text-emerald-600 dark:text-emerald-400" />
+                    <span>Bulk Intake</span>
+                  </button>
+                  <Link
+                    to="/students/add"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-md transition flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Plus size={16} />
+                    Add Student
+                  </Link>
+                </div>
+              </div>
+
+              {/* Quick Filters Row */}
+              <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-700/60 text-xs">
+                <span className="text-slate-400 font-semibold flex items-center gap-1">
+                  <Filter size={13} /> Filters:
+                </span>
+
+                {/* Batch Filter */}
+                <select
+                  value={selectedBatch}
+                  onChange={(e) => setSelectedBatch(e.target.value)}
+                  className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="">All Batches</option>
+                  <option value="unassigned">Unassigned Only</option>
+                  {batches.map((b) => (
+                    <option key={b._id} value={b._id}>{b.name}</option>
+                  ))}
+                </select>
+
+                {/* Status Filter */}
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="">All Student Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Training">Training</option>
+                  <option value="Test Pending">Test Pending</option>
+                  <option value="Test Scheduled">Test Scheduled</option>
+                  <option value="Passed">Passed</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Retest">Retest</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+
+                {/* Fee Status Filter */}
+                <select
+                  value={selectedFeeStatus}
+                  onChange={(e) => setSelectedFeeStatus(e.target.value)}
+                  className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="">All Fee Statuses</option>
+                  <option value="Paid">Fully Paid</option>
+                  <option value="Partially Paid">Partially Paid</option>
+                  <option value="Pending">Payment Pending</option>
+                </select>
+
+                {/* Sort Order */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium ml-auto"
+                >
+                  <option value="createdAt">Sort: Recent Admission</option>
+                  <option value="fullName">Sort: Student Name</option>
+                  <option value="studentId">Sort: Student ID</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Content Area */}
+            {loading ? (
+              <LoadingSpinner message="Fetching students from MongoDB..." />
+            ) : error ? (
+              <ErrorMessage message={error} onRetry={() => fetchStudentsData(pagination.page)} />
+            ) : students.length === 0 ? (
+              <EmptyState
+                title="No students found"
+                description={
+                  search || selectedBatch || selectedStatus || selectedFeeStatus
+                    ? "No students match your active filter criteria."
+                    : "There are currently no student records in the CRM database."
+                }
+                actionButton={
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setActiveTab('bulk')}
+                      className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 font-bold text-xs rounded-md transition inline-flex items-center gap-1.5"
+                    >
+                      <FileSpreadsheet size={16} className="text-emerald-600" />
+                      Bulk Intake
+                    </button>
+                    <Link
+                      to="/students/add"
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-md transition inline-flex items-center gap-1.5"
+                    >
+                      <Plus size={16} />
+                      + Add Student
+                    </Link>
+                  </div>
+                }
+              />
+            ) : (
+              <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+                <DataTable
+                  columns={columns}
+                  data={students}
+                  onRowClick={(row) => navigate(`/students/${row._id}`)}
+                  emptyMessage="No students found."
+                />
+                <Pagination
+                  pagination={pagination}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
 

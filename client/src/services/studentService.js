@@ -10,3 +10,4 @@ export const transferStudentBatch = (id, data) => API.post(`/students/${id}/batc
 export const addStudentDocument = (id, data) => API.post(`/students/${id}/documents`, data);
 export const updateDocumentStatus = (id, docId, data) => API.patch(`/students/${id}/documents/${docId}`, data);
 export const deleteStudent = (id) => API.delete(`/students/${id}`);
+export const bulkImportStudents = (students) => API.post('/students/bulk-import', { students });
