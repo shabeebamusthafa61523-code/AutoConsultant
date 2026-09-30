@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import MainLayout from '../../layouts/MainLayout';
 import Navbar from '../../components/Navbar';
 import DataTable from '../../components/DataTable';
@@ -11,6 +11,7 @@ import Modal from '../../components/Modal';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import Badge from '../../components/Badge';
 import StatCard from '../../components/StatCard';
+import QuickClassTab from './QuickClassTab';
 import { useAuth } from '../../context/AuthContext';
 import {
   getClasses,
@@ -60,7 +61,9 @@ import {
   ExternalLink,
   ChevronRight,
   ClipboardList,
-  Sparkles
+  Sparkles,
+  Zap,
+  Eye
 } from 'lucide-react';
 
 const TRAINING_TYPES = [
@@ -77,11 +80,20 @@ const TRAINING_TYPES = [
 
 const ClassListPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tabQuery = searchParams.get('tab');
+
   const { user } = useAuth();
   const canDelete = user?.role === 'Superadmin' || user?.role === 'Admin';
 
   // Navigation Tabs: Ledger | Progress Tracker | Daily Schedules | Operations & Workload
-  const [activeTab, setActiveTab] = useState('ledger');
+  const [activeTab, setActiveTab] = useState(tabQuery || 'ledger');
+
+  useEffect(() => {
+    if (tabQuery && ['ledger', 'tracker', 'schedules', 'workload', 'quick'].includes(tabQuery)) {
+      setActiveTab(tabQuery);
+    }
+  }, [tabQuery]);
 
   // Master Data State
   const [students, setStudents] = useState([]);
@@ -130,6 +142,12 @@ const ClassListPage = () => {
     total: 0,
     totalPages: 1
   });
+
+  // Quick Class Modal State
+  const [quickClassModalOpen, setQuickClassModalOpen] = useState(false);
+
+  // View Class Details Modal State
+  const [viewDetailsClassTarget, setViewDetailsClassTarget] = useState(null);
 
   // Modal State for Add / Edit Class
   const [modalOpen, setModalOpen] = useState(false);
@@ -677,10 +695,18 @@ const ClassListPage = () => {
     );
   });
 
-  // Students eligible for selected batch in Schedule modal
-  const batchStudentsForSchedule = students.filter((s) => {
-    if (!scheduleFormData.batch) return true;
-    return s.batch === scheduleFormData.batch || s.batch?._id === scheduleFormData.batch;
+  // State for Schedule modal student filter
+  const [scheduleStudentSearch, setScheduleStudentSearch] = useState('');
+
+  // All students for Schedule modal (lists all students in database with live search)
+  const allStudentsForSchedule = students.filter((s) => {
+    if (!scheduleStudentSearch.trim()) return true;
+    const term = scheduleStudentSearch.toLowerCase();
+    return (
+      s.fullName?.toLowerCase().includes(term) ||
+      s.studentId?.toLowerCase().includes(term) ||
+      s.primaryMobile?.toLowerCase().includes(term)
+    );
   });
 
   // =========================================================================
@@ -813,6 +839,13 @@ const ClassListPage = () => {
       cell: (row) => (
         <div className="flex items-center justify-end gap-1.5">
           <button
+            onClick={() => setViewDetailsClassTarget(row)}
+            title="View Full Class Session Details"
+            className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded transition"
+          >
+            <Eye size={16} />
+          </button>
+          <button
             onClick={() => handleOpenEditModal(row)}
             title="Edit Class Record"
             className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded transition"
@@ -875,8 +908,17 @@ const ClassListPage = () => {
             )}
           </form>
 
-          {/* Action Buttons: Backup & + Student */}
+          {/* Action Buttons: Quick Class, Backup & + Student */}
           <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => setActiveTab('quick')}
+              title="Switch to Quick Class tab to schedule or log sessions"
+              className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-md transition flex items-center gap-1.5 shadow-xs"
+            >
+              <Zap size={15} className="text-amber-300 animate-pulse" />
+              <span>Quick Class</span>
+            </button>
+
             <button
               onClick={handleBackup}
               disabled={backingUp}
@@ -964,7 +1006,8 @@ const ClassListPage = () => {
             { id: 'ledger', label: 'Training Ledger', icon: CalendarCheck, count: pagination.total },
             { id: 'tracker', label: 'Training Progress Tracker', icon: Award, count: trackerPagination?.total },
             { id: 'schedules', label: 'Daily Class Schedules', icon: Clock, count: schedules.length },
-            { id: 'workload', label: 'Operations & Workload', icon: BarChart3 }
+            { id: 'workload', label: 'Operations & Workload', icon: BarChart3 },
+            { id: 'quick', label: 'Quick Class', icon: Zap }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -991,6 +1034,26 @@ const ClassListPage = () => {
             </button>
           ))}
         </div>
+
+        {/* ========================================================================= */}
+        {/* TAB 0: QUICK CLASS SCHEDULER VIEW */}
+        {/* ========================================================================= */}
+        {activeTab === 'quick' && (
+          <QuickClassTab
+            students={students}
+            instructors={instructors}
+            vehicles={vehicles}
+            batches={batches}
+            recentClasses={classes}
+            onClassCreated={() => {
+              fetchLedgerData(1);
+              fetchTrackerData(1);
+            }}
+            onDeleteClass={() => {
+              fetchLedgerData(1);
+            }}
+          />
+        )}
 
         {/* ========================================================================= */}
         {/* TAB 1: TRAINING LEDGER VIEW */}
@@ -2279,12 +2342,12 @@ const ClassListPage = () => {
                   onClick={() =>
                     setScheduleFormData({
                       ...scheduleFormData,
-                      students: batchStudentsForSchedule.map((s) => s._id)
+                      students: allStudentsForSchedule.map((s) => s._id)
                     })
                   }
                   className="text-red-600 dark:text-red-400 font-bold hover:underline"
                 >
-                  Select All
+                  Select All Listed
                 </button>
                 <span>&bull;</span>
                 <button
@@ -2297,19 +2360,34 @@ const ClassListPage = () => {
               </div>
             </div>
 
-            <div className="max-h-36 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5 bg-slate-50/50 dark:bg-slate-900/50">
-              {batchStudentsForSchedule.length === 0 ? (
+            {/* Quick Live Search Filter */}
+            <div className="relative mb-2">
+              <Search className="absolute left-2.5 top-2 text-slate-400" size={14} />
+              <input
+                type="text"
+                value={scheduleStudentSearch}
+                onChange={(e) => setScheduleStudentSearch(e.target.value)}
+                placeholder="Search all students by name, ID, or phone..."
+                className="w-full pl-8 pr-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
+              />
+            </div>
+
+            <div className="max-h-44 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-md p-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5 bg-slate-50/50 dark:bg-slate-900/50">
+              {allStudentsForSchedule.length === 0 ? (
                 <p className="text-xs text-slate-400 p-2 col-span-2 text-center">
-                  No students assigned to this batch yet.
+                  No matching students found.
                 </p>
               ) : (
-                batchStudentsForSchedule.map((s) => {
+                allStudentsForSchedule.map((s) => {
                   const isChecked = scheduleFormData.students.includes(s._id);
+                  const bObj = batches.find(b => b._id === (s.batch?._id || s.batch));
                   return (
                     <label
                       key={s._id}
-                      className={`flex items-center gap-2 p-1 rounded text-xs cursor-pointer ${
-                        isChecked ? 'bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 font-semibold' : 'text-slate-600 dark:text-slate-400'
+                      className={`flex items-start gap-2 p-1.5 rounded text-xs cursor-pointer border transition ${
+                        isChecked
+                          ? 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-900 text-red-900 dark:text-red-200 font-semibold'
+                          : 'border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                     >
                       <input
@@ -2321,9 +2399,15 @@ const ClassListPage = () => {
                             : [...scheduleFormData.students, s._id];
                           setScheduleFormData({ ...scheduleFormData, students: updated });
                         }}
-                        className="w-3.5 h-3.5 text-red-600 rounded"
+                        className="w-3.5 h-3.5 mt-0.5 text-red-600 rounded shrink-0"
                       />
-                      <span className="truncate">{s.fullName}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-bold text-slate-900 dark:text-slate-100">{s.fullName}</div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {s.studentId || ''} {s.primaryMobile ? `• ${s.primaryMobile}` : ''}
+                          {bObj ? ` (${bObj.name})` : ''}
+                        </div>
+                      </div>
                     </label>
                   );
                 })
@@ -2469,6 +2553,147 @@ const ClassListPage = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* VIEW FULL CLASS DETAILS MODAL */}
+      {/* ========================================================================= */}
+      <Modal
+        isOpen={Boolean(viewDetailsClassTarget)}
+        onClose={() => setViewDetailsClassTarget(null)}
+        title="Driving Class Session Details"
+        maxWidth="max-w-2xl"
+      >
+        {viewDetailsClassTarget && (() => {
+          const cls = viewDetailsClassTarget;
+          const stu = cls.student || {};
+          const ins = cls.instructorRef || {};
+          const veh = cls.vehicleRef || {};
+          const km = Number(cls.km || 0);
+          const h = Number(cls.hours || 0);
+          const bike = Number(cls.bikeClassCount || 0);
+          const eq = Math.round(((km / 5) + (h / 3) + bike) * 100) / 100;
+
+          return (
+            <div className="space-y-4 text-xs font-sans">
+              {/* Candidate Profile Header Card */}
+              <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Candidate Info</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                      {stu.fullName || 'Student'}
+                    </h3>
+                    <span className="font-mono text-[11px] font-bold text-red-600 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded border border-red-200 dark:border-red-900">
+                      {stu.studentId || 'STU-XXXX'}
+                    </span>
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5 font-mono">
+                    Mobile: {stu.primaryMobile || '—'} &bull; {stu.coursePackage || stu.vehicleType || 'LMV Fresh Licence'}
+                  </p>
+                </div>
+
+                <Badge type="status" value={cls.status || 'Completed'} />
+              </div>
+
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Class Date</span>
+                  <span className="font-mono text-xs font-extrabold text-slate-800 dark:text-slate-200 mt-0.5 block">
+                    {cls.classDate ? new Date(cls.classDate).toLocaleDateString() : '—'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Time Slot</span>
+                  <span className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200 mt-0.5 block">
+                    {cls.timeSlot || '07:00 AM - 08:30 AM'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Training Module</span>
+                  <span className="font-semibold text-xs text-slate-800 dark:text-slate-200 mt-0.5 block">
+                    {cls.trainingType || 'Practical Driving'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Assigned Instructor</span>
+                  <span className="font-bold text-xs text-slate-800 dark:text-slate-200 mt-0.5 block">
+                    {ins.name || cls.instructor || 'Unassigned'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Allocated Vehicle</span>
+                  <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5 block">
+                    {veh.vehicleNumber || cls.vehicleNo || 'KL-10-AB-5265'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Batch</span>
+                  <span className="font-semibold text-xs text-slate-800 dark:text-slate-200 mt-0.5 block">
+                    {cls.batch?.name || 'Standard Batch'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Metrics & Equivalent Classes Breakdown Banner */}
+              <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-md flex items-center justify-between gap-3 font-mono">
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase block">
+                    Session Metrics Logged
+                  </span>
+                  <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
+                    {km} KM &bull; {h} hr(s) &bull; {bike} Bike Session(s)
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 block">
+                    +{eq} Eq. Classes
+                  </span>
+                  <span className="text-[9px] text-emerald-600 dark:text-emerald-400 block font-sans font-medium">
+                    Formula: ({km}/5 + {h}/3)
+                  </span>
+                </div>
+              </div>
+
+              {/* Remarks / Notes */}
+              {cls.notes && (
+                <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-700">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                    Session Remarks / Training Notes
+                  </span>
+                  <p className="text-slate-700 dark:text-slate-300">{cls.notes}</p>
+                </div>
+              )}
+
+              {/* Modal Action Buttons */}
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-700">
+                <button
+                  onClick={() => setViewDetailsClassTarget(null)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-md transition"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    const target = viewDetailsClassTarget;
+                    setViewDetailsClassTarget(null);
+                    handleOpenEditModal(target);
+                  }}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-md transition flex items-center gap-1 shadow-xs"
+                >
+                  <Edit size={14} />
+                  <span>Edit Record</span>
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* ========================================================================= */}

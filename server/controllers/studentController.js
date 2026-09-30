@@ -4,6 +4,7 @@ const Class = require('../models/Class');
 const Payment = require('../models/Payment');
 const Attendance = require('../models/Attendance');
 const StudentDocument = require('../models/StudentDocument');
+const Counter = require('../models/Counter');
 const generateStudentId = require('../utils/generateStudentId');
 
 // Helper to sanitize Indian mobile numbers
@@ -746,6 +747,150 @@ const deleteStudent = async (req, res, next) => {
   }
 };
 
+// @desc    Bulk Import Students from JSON array (Excel/CSV parsed)
+// @route   POST /api/students/bulk-import
+const bulkImportStudents = async (req, res, next) => {
+  try {
+    const { students } = req.body;
+    if (!Array.isArray(students) || students.length === 0) {
+      res.status(400);
+      throw new Error('Please provide an array of student records to import.');
+    }
+
+    // Pre-fetch all batches for fast name matching
+    const allBatches = await Batch.find().select('_id name');
+    const batchMap = new Map();
+    allBatches.forEach((b) => {
+      if (b.name) {
+        batchMap.set(b.name.toLowerCase().trim(), b._id);
+      }
+    });
+
+    const createdStudents = [];
+    const skippedRecords = [];
+
+    for (let i = 0; i < students.length; i++) {
+      const item = students[i];
+      const fullName = item.fullName || item.name || item['Full Name'] || item['Student Name'] || item['Name'];
+      const rawMobile = item.primaryMobile || item.mobile || item['Mobile'] || item['Primary Mobile'] || item['Phone'];
+
+      if (!fullName || !rawMobile) {
+        skippedRecords.push({ row: i + 1, reason: 'Missing Name or Mobile Number' });
+        continue;
+      }
+
+      const cleanedMobile = cleanPhone(rawMobile);
+      if (!/^[6-9]\d{9}$/.test(cleanedMobile)) {
+        skippedRecords.push({ row: i + 1, name: fullName, mobile: rawMobile, reason: 'Invalid 10-digit Indian Mobile Number' });
+        continue;
+      }
+
+      // Check if student with this mobile already exists
+      const existing = await Student.findOne({
+        primaryMobile: cleanedMobile,
+        currentStatus: { $ne: 'Dropped' }
+      });
+      if (existing) {
+        skippedRecords.push({ row: i + 1, name: fullName, mobile: cleanedMobile, reason: `Mobile already registered under ${existing.studentId}` });
+        continue;
+      }
+
+      // Match batch if provided
+      let batchId = null;
+      const rawBatch = item.batchName || item.batch || item['Batch'] || item['Batch Name'];
+      if (rawBatch && typeof rawBatch === 'string') {
+        const matchedId = batchMap.get(rawBatch.toLowerCase().trim());
+        if (matchedId) batchId = matchedId;
+      }
+
+      // Fees parsing
+      const totalFee = Number(item.totalFee || item['Total Fee'] || item['Course Fee'] || 9000);
+      const paidAmount = Number(item.paidAmount || item['Paid Amount'] || item['Paid'] || 0);
+      const advanceAmount = Number(item.advanceAmount || item['Advance Amount'] || item['Advance'] || 0);
+
+      // Generate atomic STU ID
+      const studentId = await generateStudentId();
+
+      // Gender, Vehicle Type, Course Package
+      const gender = ['Male', 'Female', 'Other'].includes(item.gender || item['Gender']) ? (item.gender || item['Gender']) : 'Male';
+      const vehicleType = item.vehicleType || item['Vehicle Type'] || '4 Wheeler';
+      const coursePackage = item.coursePackage || item['Course Package'] || item['Course'] || 'LMV+MCWG (Fresh Licence)';
+      const aliasSourceName = item.aliasSourceName || item['Source'] || item['Alias Source Name'] || 'Bulk Intake Import';
+      const notes = item.notes || item['Notes'] || item['Remarks'] || 'Imported via Bulk Intake';
+
+      const newStudent = await Student.create({
+        studentId,
+        fullName: String(fullName).trim(),
+        gender,
+        primaryMobile: cleanedMobile,
+        alternateMobile: item.alternateMobile ? cleanPhone(item.alternateMobile) : '',
+        aliasSourceName,
+        coursePackage,
+        vehicleType,
+        licenceCategory: item.licenceCategory || 'LMV',
+        batch: batchId,
+        totalFee: isNaN(totalFee) ? 9000 : totalFee,
+        paidAmount: isNaN(paidAmount) ? 0 : paidAmount,
+        advanceAmount: isNaN(advanceAmount) ? 0 : advanceAmount,
+        notes,
+        currentStatus: item.currentStatus || 'Active',
+        trainingProgress: {
+          status: 'Not Started',
+          requiredClasses: 20,
+          pendingClasses: 20,
+          equivalentClasses: 0,
+          completionPercentage: 0
+        },
+        timeline: [
+          {
+            action: 'Bulk Intake Registration',
+            category: 'Registration',
+            description: `Candidate registered via Bulk Intake import (${studentId}). Total Fee: ₹${totalFee}`,
+            timestamp: new Date(),
+            performedBy: req.user ? req.user.name : 'System'
+          }
+        ]
+      });
+
+      // If initial payment was included in import, create Payment record
+      if (paidAmount > 0) {
+        const counter = await Counter.findByIdAndUpdate(
+          { _id: 'receiptNo' },
+          { $inc: { seq: 1 } },
+          { new: true, upsert: true }
+        );
+        const receiptNo = `REC-${String(counter.seq).padStart(4, '0')}`;
+
+        await Payment.create({
+          receiptNo,
+          student: newStudent._id,
+          amount: paidAmount,
+          paymentType: 'Fee Payment',
+          paymentMethod: 'Cash',
+          previousBalance: totalFee,
+          balanceAfter: Math.max(0, totalFee - paidAmount - advanceAmount),
+          status: 'Completed',
+          notes: 'Initial Payment from Bulk Import',
+          recordedBy: req.user ? req.user._id : null
+        });
+      }
+
+      createdStudents.push(newStudent);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Successfully imported ${createdStudents.length} candidate(s).`,
+      importedCount: createdStudents.length,
+      skippedCount: skippedRecords.length,
+      skippedRecords,
+      students: createdStudents
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStudents,
   getStudentById,
@@ -756,5 +901,6 @@ module.exports = {
   transferStudentBatch,
   addStudentDocument,
   updateDocumentStatus,
-  deleteStudent
+  deleteStudent,
+  bulkImportStudents
 };
