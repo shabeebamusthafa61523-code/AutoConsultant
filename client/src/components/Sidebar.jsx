@@ -17,8 +17,11 @@ import {
   Car,
   FileCheck,
   AlertCircle,
+  GitPullRequest,
   BookOpen,
-  TrendingDown
+  TrendingDown,
+  Clock,
+  Briefcase
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -31,6 +34,8 @@ const Sidebar = () => {
       items: [
         { label: 'Dashboard', path: '/', icon: LayoutDashboard },
         { label: 'Students', path: '/students', icon: Users },
+        { label: 'Workflow Control', path: '/workflow', icon: GitPullRequest },
+        { label: 'Calendar / Follow-Up', path: '/calendar', icon: CalendarCheck },
         { label: 'Enquiries', path: '/enquiries', icon: HelpCircle }
       ]
     },
@@ -41,14 +46,16 @@ const Sidebar = () => {
         { label: 'Student Ledger', path: '/student-ledger', icon: BookOpen },
         { label: 'Daily Collection', path: '/daily-collection', icon: CalendarCheck },
         { label: 'Expenses', path: '/expenses', icon: TrendingDown },
-        { label: 'Course Fee', path: '/course-fees', icon: Receipt }
+        { label: 'Refund / Credit / Debit Notes', path: '/refund-notes', icon: Receipt },
+        { label: 'Services', path: '/services', icon: Briefcase }
       ]
     },
     {
       title: 'TRAINING & FLEET',
       items: [
         { label: 'Batches', path: '/batches', icon: Layers },
-        { label: 'Classes', path: '/classes', icon: CalendarCheck },
+        { label: 'Class Register', path: '/classes?tab=ledger', icon: CalendarCheck },
+        { label: 'Class Timetable', path: '/classes?tab=schedules', icon: Clock },
         { label: 'Instructors', path: '/instructors', icon: GraduationCap },
         { label: 'Vehicles', path: '/vehicles', icon: Car }
       ]
@@ -101,21 +108,26 @@ const Sidebar = () => {
 
             {section.items.map((item) => {
               const Icon = item.icon;
+              const currentPathWithSearch = window.location.pathname + window.location.search;
               return (
                 <NavLink
                   key={item.path}
                   to={item.path}
                   end={item.path === '/'}
                   title={isCollapsed ? item.label : undefined}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3.5 py-2 rounded-md text-xs font-semibold transition ${
+                  className={({ isActive }) => {
+                    const isItemActive = item.path.includes('?')
+                      ? currentPathWithSearch === item.path
+                      : (isActive && !window.location.search.includes('tab='));
+
+                    return `flex items-center gap-3 px-3.5 py-2 rounded-md text-xs font-semibold transition ${
                       isCollapsed ? 'justify-center' : ''
                     } ${
-                      isActive
+                      isItemActive
                         ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-bold border-l-4 border-red-600 shadow-xs'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-white'
-                    }`
-                  }
+                    }`;
+                  }}
                 >
                   <Icon size={18} className="shrink-0" />
                   {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">{item.label}</span>}

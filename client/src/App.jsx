@@ -9,12 +9,15 @@ import DashboardPage from './pages/DashboardPage';
 import StudentListPage from './pages/Students/StudentListPage';
 import StudentFormPage from './pages/Students/StudentFormPage';
 import StudentDetailPage from './pages/Students/StudentDetailPage';
+import WorkflowControlPage from './pages/Workflow/WorkflowControlPage';
+import CalendarFollowUpPage from './pages/Calendar/CalendarFollowUpPage';
 import BatchListPage from './pages/Batches/BatchListPage';
 import BatchDetailPage from './pages/Batches/BatchDetailPage';
 import ClassListPage from './pages/Classes/ClassListPage';
 import EnquiryListPage from './pages/Enquiries/EnquiryListPage';
 import PaymentListPage from './pages/Payments/PaymentListPage';
 import CourseFeeListPage from './pages/CourseFees/CourseFeeListPage';
+import ServicesPage from './pages/Services/ServicesPage';
 import UsersPage from './pages/UsersPage';
 import InstructorListPage from './pages/Instructors/InstructorListPage';
 import InstructorDetailPage from './pages/Instructors/InstructorDetailPage';
@@ -26,6 +29,7 @@ import ComplaintDetailPage from './pages/Complaints/ComplaintDetailPage';
 import StudentLedgerPage from './pages/StudentLedger/StudentLedgerPage';
 import ExpenseListPage from './pages/Expenses/ExpenseListPage';
 import DailyCollectionPage from './pages/DailyCollection/DailyCollectionPage';
+import RefundCreditDebitPage from './pages/Financials/RefundCreditDebitPage';
 
 function App() {
   return (
@@ -39,11 +43,13 @@ function App() {
             {/* Protected Application Routes */}
             <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
 
-            {/* Student Routes */}
+            {/* Student & Workflow Routes */}
             <Route path="/students" element={<ProtectedRoute><StudentListPage /></ProtectedRoute>} />
             <Route path="/students/add" element={<ProtectedRoute><StudentFormPage /></ProtectedRoute>} />
             <Route path="/students/:id" element={<ProtectedRoute><StudentDetailPage /></ProtectedRoute>} />
             <Route path="/students/:id/edit" element={<ProtectedRoute><StudentFormPage /></ProtectedRoute>} />
+            <Route path="/workflow" element={<ProtectedRoute><WorkflowControlPage /></ProtectedRoute>} />
+            <Route path="/calendar" element={<ProtectedRoute><CalendarFollowUpPage /></ProtectedRoute>} />
 
             {/* Batch Routes */}
             <Route path="/batches" element={<ProtectedRoute><BatchListPage /></ProtectedRoute>} />
@@ -70,9 +76,10 @@ function App() {
             {/* Enquiry Routes */}
             <Route path="/enquiries" element={<ProtectedRoute><EnquiryListPage /></ProtectedRoute>} />
 
-            {/* Payment Routes */}
+            {/* Payment & Refund Routes */}
             <Route path="/payments" element={<ProtectedRoute><PaymentListPage /></ProtectedRoute>} />
             <Route path="/daily-collection" element={<ProtectedRoute><DailyCollectionPage /></ProtectedRoute>} />
+            <Route path="/refund-notes" element={<ProtectedRoute><RefundCreditDebitPage /></ProtectedRoute>} />
 
             {/* Expenses Routes */}
             <Route path="/expenses" element={<ProtectedRoute><ExpenseListPage /></ProtectedRoute>} />
@@ -81,8 +88,9 @@ function App() {
             <Route path="/student-ledger" element={<ProtectedRoute><StudentLedgerPage /></ProtectedRoute>} />
             <Route path="/student-ledger/:id" element={<ProtectedRoute><StudentLedgerPage /></ProtectedRoute>} />
 
-            {/* Course Fee Routes */}
-            <Route path="/course-fees" element={<ProtectedRoute><CourseFeeListPage /></ProtectedRoute>} />
+            {/* Services & Course Package Routes */}
+            <Route path="/services" element={<ProtectedRoute><ServicesPage /></ProtectedRoute>} />
+            <Route path="/course-fees" element={<ProtectedRoute><ServicesPage /></ProtectedRoute>} />
 
             {/* Users Route */}
             <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />

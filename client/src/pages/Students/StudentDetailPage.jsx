@@ -8,6 +8,7 @@ import ErrorMessage from '../../components/ErrorMessage';
 import Modal from '../../components/Modal';
 import Badge from '../../components/Badge';
 import TransferStudentModal from '../../components/TransferStudentModal';
+import ReceiptModal from '../../components/ReceiptModal';
 import {
   getStudentDetails,
   updateStudentStatus,
@@ -42,7 +43,9 @@ import {
   Car,
   CheckCircle2,
   AlertCircle,
-  Percent
+  Percent,
+  Printer,
+  Receipt
 } from 'lucide-react';
 
 const StudentDetailPage = () => {
@@ -81,6 +84,9 @@ const StudentDetailPage = () => {
     paymentMethod: 'Cash',
     notes: ''
   });
+
+  // Selected Receipt Modal State for Payment History Ledger
+  const [selectedReceiptPayment, setSelectedReceiptPayment] = useState(null);
 
   // Transfer Batch Modal State
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -1017,23 +1023,58 @@ const StudentDetailPage = () => {
               <DataTable
                 columns={[
                   {
-                    header: 'Payment Date',
-                    cell: (row) => new Date(row.paymentDate).toLocaleDateString()
+                    header: 'Receipt #',
+                    cell: (row) => (
+                      <button
+                        onClick={() => setSelectedReceiptPayment(row)}
+                        title="Click to view printable receipt for this payment"
+                        className="font-mono text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded hover:underline inline-flex items-center gap-1"
+                      >
+                        <Receipt size={12} />
+                        <span>{row.receiptNo || `REC-${String(row._id || '0000').slice(-4).toUpperCase()}`}</span>
+                      </button>
+                    )
                   },
                   {
-                    header: 'Amount',
-                    cell: (row) => <span className="font-bold text-emerald-600 font-mono text-sm">₹ {row.amount}</span>
+                    header: 'Payment Date',
+                    cell: (row) => (
+                      <span className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-300">
+                        {row.paymentDate ? new Date(row.paymentDate).toLocaleDateString() : '—'}
+                      </span>
+                    )
+                  },
+                  {
+                    header: 'Amount Paid',
+                    cell: (row) => (
+                      <span className="font-black text-emerald-600 dark:text-emerald-400 font-mono text-sm">
+                        ₹ {row.amount}
+                      </span>
+                    )
                   },
                   { header: 'Payment Type', accessor: 'paymentType' },
                   {
                     header: 'Method',
                     cell: (row) => (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                        {row.paymentMethod}
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-mono">
+                        {row.paymentMethod || 'Cash'}
                       </span>
                     )
                   },
-                  { header: 'Receipt / Notes', accessor: 'notes' }
+                  { header: 'Notes', accessor: 'notes' },
+                  {
+                    header: 'Receipt',
+                    className: 'text-right',
+                    cell: (row) => (
+                      <button
+                        onClick={() => setSelectedReceiptPayment(row)}
+                        title="View & Print Official Receipt for this amount"
+                        className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded transition inline-flex items-center gap-1 font-semibold text-xs"
+                      >
+                        <Printer size={15} />
+                        <span>Print Receipt</span>
+                      </button>
+                    )
+                  }
                 ]}
                 data={payments}
                 emptyMessage="No payments logged yet for this candidate."
@@ -1401,6 +1442,16 @@ const StudentDetailPage = () => {
         currentBatchId={student.batch?._id || student.batch}
         onTransferSuccess={handleTransferBatch}
       />
+
+      {/* OFFICIAL RECEIPT MODAL */}
+      {selectedReceiptPayment && (
+        <ReceiptModal
+          isOpen={!!selectedReceiptPayment}
+          onClose={() => setSelectedReceiptPayment(null)}
+          payment={selectedReceiptPayment}
+          student={student}
+        />
+      )}
     </MainLayout>
   );
 };

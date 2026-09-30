@@ -10,13 +10,16 @@ const {
   transferStudentBatch,
   addStudentDocument,
   updateDocumentStatus,
-  deleteStudent
+  deleteStudent,
+  bulkImportStudents
 } = require('../controllers/studentController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.route('/')
   .get(protect, getStudents)
   .post(protect, createStudent);
+
+router.post('/bulk-import', protect, bulkImportStudents);
 
 router.get('/:id/details', protect, getStudentDetails);
 

@@ -721,7 +721,7 @@ const StudentFormPage = () => {
                 type="number"
                 name="totalFee"
                 min="0"
-                step="100"
+                step="any"
                 value={formData.totalFee}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-sm font-black focus:ring-2 focus:ring-red-500"
@@ -736,7 +736,7 @@ const StudentFormPage = () => {
                 type="number"
                 name="paidAmount"
                 min="0"
-                step="100"
+                step="any"
                 value={formData.paidAmount}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 rounded-md text-sm font-black focus:ring-2 focus:ring-red-500"
@@ -751,7 +751,7 @@ const StudentFormPage = () => {
                 type="number"
                 name="advanceAmount"
                 min="0"
-                step="100"
+                step="any"
                 value={formData.advanceAmount}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 rounded-md text-sm font-black focus:ring-2 focus:ring-red-500"
