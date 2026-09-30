@@ -19,6 +19,8 @@ import { createClass } from '../../services/classService';
 import { createPayment } from '../../services/paymentService';
 import { getBatches } from '../../services/batchService';
 import { getUsers } from '../../services/userService';
+import { updateStudentStage } from '../../services/workflowService';
+import { createFollowUp, completeFollowUp, rescheduleFollowUp } from '../../services/followUpService';
 import {
   ArrowLeft,
   Edit,
@@ -42,7 +44,11 @@ import {
   Car,
   CheckCircle2,
   AlertCircle,
-  Percent
+  Percent,
+  Workflow,
+  CalendarClock,
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react';
 
 const StudentDetailPage = () => {
@@ -94,6 +100,35 @@ const StudentDetailPage = () => {
     verificationStatus: 'Verified',
     remarks: ''
   });
+
+  // Workflow Stage Modal State
+  const [workflowModalOpen, setWorkflowModalOpen] = useState(false);
+  const [workflowTargetStage, setWorkflowTargetStage] = useState('');
+  const [workflowNotes, setWorkflowNotes] = useState('');
+  const [workflowNextAction, setWorkflowNextAction] = useState('');
+  const [workflowNextActionDate, setWorkflowNextActionDate] = useState('');
+  const [workflowCreateFollowUp, setWorkflowCreateFollowUp] = useState(false);
+  const [workflowFollowUpTask, setWorkflowFollowUpTask] = useState('');
+  const [workflowFollowUpDate, setWorkflowFollowUpDate] = useState('');
+  const [workflowFollowUpPriority, setWorkflowFollowUpPriority] = useState('High');
+  const [workflowSubmitting, setWorkflowSubmitting] = useState(false);
+
+  // Quick Add Follow-Up Modal State
+  const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
+  const [followUpTask, setFollowUpTask] = useState('');
+  const [followUpDueDate, setFollowUpDueDate] = useState('');
+  const [followUpDueTime, setFollowUpDueTime] = useState('10:00 AM');
+  const [followUpPriority, setFollowUpPriority] = useState('Medium');
+  const [followUpNotes, setFollowUpNotes] = useState('');
+  const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
+
+  // Reschedule Follow-Up Modal State
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState(null);
+  const [rescheduleNewDate, setRescheduleNewDate] = useState('');
+  const [rescheduleNewTime, setRescheduleNewTime] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
 
   const fetchDetails = async () => {
     try {
@@ -207,6 +242,121 @@ const StudentDetailPage = () => {
     }
   };
 
+  const openWorkflowModal = (currentStage) => {
+    setWorkflowTargetStage(currentStage || student?.workflowStage || 'Application');
+    setWorkflowNotes('');
+    setWorkflowNextAction(details?.student?.nextAction || '');
+    setWorkflowNextActionDate(details?.student?.followUpDate ? details.student.followUpDate.split('T')[0] : '');
+    setWorkflowCreateFollowUp(false);
+    setWorkflowFollowUpTask(`Action for ${currentStage || 'current stage'}`);
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + 3);
+    setWorkflowFollowUpDate(nextDate.toISOString().split('T')[0]);
+    setWorkflowFollowUpPriority('High');
+    setWorkflowModalOpen(true);
+  };
+
+  const handleWorkflowStageSubmit = async (e) => {
+    e.preventDefault();
+    if (!workflowTargetStage) return;
+    try {
+      setWorkflowSubmitting(true);
+      await updateStudentStage(id, {
+        stage: workflowTargetStage,
+        notes: workflowNotes.trim(),
+        nextAction: workflowNextAction.trim(),
+        nextActionDate: workflowNextActionDate || null,
+        createFollowUp: workflowCreateFollowUp,
+        followUpData: workflowCreateFollowUp ? {
+          task: workflowFollowUpTask.trim(),
+          dueDate: workflowFollowUpDate,
+          priority: workflowFollowUpPriority,
+          notes: workflowNotes.trim()
+        } : null
+      });
+      setWorkflowModalOpen(false);
+      await fetchDetails();
+      alert('Workflow stage updated successfully!');
+    } catch (err) {
+      alert(err.message || 'Failed to update workflow stage');
+    } finally {
+      setWorkflowSubmitting(false);
+    }
+  };
+
+  const openAddFollowUpModal = () => {
+    setFollowUpTask(`Follow-up with ${details?.student?.fullName || 'student'}`);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 2);
+    setFollowUpDueDate(tomorrow.toISOString().split('T')[0]);
+    setFollowUpDueTime('10:00 AM');
+    setFollowUpPriority('Medium');
+    setFollowUpNotes('');
+    setFollowUpModalOpen(true);
+  };
+
+  const handleCreateFollowUpSubmit = async (e) => {
+    e.preventDefault();
+    if (!followUpTask || !followUpDueDate) return;
+    try {
+      setFollowUpSubmitting(true);
+      await createFollowUp({
+        student: id,
+        task: followUpTask.trim(),
+        dueDate: followUpDueDate,
+        dueTime: followUpDueTime,
+        priority: followUpPriority,
+        relatedStage: details?.student?.workflowStage || '',
+        notes: followUpNotes.trim()
+      });
+      setFollowUpModalOpen(false);
+      await fetchDetails();
+      alert('Follow-up created successfully!');
+    } catch (err) {
+      alert(err.message || 'Failed to create follow-up');
+    } finally {
+      setFollowUpSubmitting(false);
+    }
+  };
+
+  const handleCompleteFollowUp = async (followUpId) => {
+    try {
+      await completeFollowUp(followUpId);
+      await fetchDetails();
+    } catch (err) {
+      alert(err.message || 'Failed to complete follow-up');
+    }
+  };
+
+  const openRescheduleModal = (task) => {
+    setRescheduleTarget(task);
+    const d = task.dueDate ? new Date(task.dueDate) : new Date();
+    d.setDate(d.getDate() + 2);
+    setRescheduleNewDate(d.toISOString().split('T')[0]);
+    setRescheduleNewTime(task.dueTime || '10:00 AM');
+    setRescheduleReason('');
+    setRescheduleModalOpen(true);
+  };
+
+  const handleRescheduleSubmit = async (e) => {
+    e.preventDefault();
+    if (!rescheduleTarget || !rescheduleNewDate) return;
+    try {
+      setRescheduleSubmitting(true);
+      await rescheduleFollowUp(rescheduleTarget._id, {
+        newDueDate: rescheduleNewDate,
+        newDueTime: rescheduleNewTime,
+        reason: rescheduleReason.trim()
+      });
+      setRescheduleModalOpen(false);
+      await fetchDetails();
+    } catch (err) {
+      alert(err.message || 'Failed to reschedule follow-up');
+    } finally {
+      setRescheduleSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <MainLayout>
@@ -225,11 +375,21 @@ const StudentDetailPage = () => {
     );
   }
 
-  const { student, classes = [], payments = [], attendance = [], stats = {}, feeSummary = {} } = details;
+  const {
+    student,
+    classes = [],
+    payments = [],
+    attendance = [],
+    stats = {},
+    feeSummary = {},
+    workflowHistory = [],
+    followUps = []
+  } = details;
   const docs = student.documentReadiness || {};
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
+    { id: 'workflow', label: `Workflow & Follow-ups (${followUps.filter(f => f.status === 'Pending').length})` },
     { id: 'personal', label: 'Personal & Admission' },
     { id: 'licence', label: 'Licence & RTO' },
     { id: 'training', label: `Training (${classes.length})` },
@@ -511,6 +671,236 @@ const StudentDetailPage = () => {
                   ))}
                 </div>
               </div>
+
+              {/* Workflow & Next Action Card in Overview */}
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                  <h3 className="font-extrabold text-slate-800 dark:text-slate-200 text-sm flex items-center gap-2">
+                    <Workflow size={16} className="text-red-600" />
+                    Workflow & Operational Stage
+                  </h3>
+                  <button
+                    onClick={() => openWorkflowModal(student.workflowStage)}
+                    className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
+                  >
+                    <ArrowRight size={13} /> Change
+                  </button>
+                </div>
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 font-medium">Current Stage:</span>
+                    <Badge value={student.workflowStage || 'Application'} />
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium block">Next Action:</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100">
+                      {student.nextAction || 'None scheduled'}
+                    </span>
+                  </div>
+                  {student.followUpDate && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">Action Date:</span>
+                      <span className="font-bold text-amber-600 dark:text-amber-400">
+                        {new Date(student.followUpDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                    <button
+                      onClick={() => setActiveTab('workflow')}
+                      className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                      View All Follow-Ups ({followUps.length}) &rarr;
+                    </button>
+                    <button
+                      onClick={openAddFollowUpModal}
+                      className="px-2 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold rounded text-[11px] border border-amber-200 dark:border-amber-900"
+                    >
+                      + Follow-Up
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: WORKFLOW & FOLLOW-UPS */}
+        {/* ========================================================================= */}
+        {activeTab === 'workflow' && (
+          <div className="space-y-6">
+            {/* Workflow Stage Control Banner */}
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-700 pb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Current Stage:</span>
+                    <Badge value={student.workflowStage || 'Application'} />
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-3">
+                    {student.previousWorkflowStage && (
+                      <span>Previous: <span className="font-semibold text-slate-700 dark:text-slate-300">{student.previousWorkflowStage}</span></span>
+                    )}
+                    <span>&bull;</span>
+                    <span>Last Updated: <span className="font-semibold text-slate-700 dark:text-slate-300">{student.workflowStageChangedAt ? new Date(student.workflowStageChangedAt).toLocaleDateString() : 'Initial'}</span></span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openWorkflowModal(student.workflowStage)}
+                    className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                  >
+                    <ArrowRight size={14} /> Change Stage
+                  </button>
+                  <button
+                    onClick={openAddFollowUpModal}
+                    className="px-3.5 py-2 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 border border-amber-200 dark:border-amber-800 rounded-md text-xs font-bold transition flex items-center gap-1.5"
+                  >
+                    <Plus size={14} /> Add Follow-Up
+                  </button>
+                </div>
+              </div>
+
+              {/* Next Action Box */}
+              <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-md border border-slate-200/60 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Upcoming Next Action</span>
+                  <span className="font-bold text-sm text-slate-800 dark:text-slate-100">
+                    {student.nextAction || 'No pending action scheduled'}
+                  </span>
+                </div>
+                {student.followUpDate && (
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded border border-amber-200 dark:border-amber-900">
+                    <Calendar size={13} />
+                    <span>Target Date: {new Date(student.followUpDate).toLocaleDateString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Follow-Ups Register for Student */}
+            <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CalendarClock size={16} className="text-amber-600" />
+                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                    Student Follow-Ups ({followUps.length})
+                  </h4>
+                </div>
+                <button
+                  onClick={openAddFollowUpModal}
+                  className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1"
+                >
+                  <Plus size={13} /> New Follow-Up
+                </button>
+              </div>
+
+              {followUps.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400 italic">
+                  No follow-ups recorded for this student. Click "+ Add Follow-Up" to create a task reminder.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-bold uppercase text-[11px] text-slate-600 dark:text-slate-300">
+                        <th className="px-4 py-2.5">Due Date</th>
+                        <th className="px-4 py-2.5">Task Description</th>
+                        <th className="px-4 py-2.5">Priority</th>
+                        <th className="px-4 py-2.5">Status</th>
+                        <th className="px-4 py-2.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 text-slate-700 dark:text-slate-200">
+                      {followUps.map((fu) => (
+                        <tr key={fu._id} className="hover:bg-slate-50/60 dark:hover:bg-slate-700/30">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
+                            <div className="font-mono font-bold">{new Date(fu.dueDate).toLocaleDateString()}</div>
+                            <div className="text-[10px] text-slate-400">{fu.dueTime || 'Standard'}</div>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="font-semibold text-slate-900 dark:text-slate-100">{fu.task}</div>
+                            {fu.notes && <div className="text-[11px] text-slate-400 italic">"{fu.notes}"</div>}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap">
+                            <Badge type="priority" value={fu.priority} />
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap">
+                            <Badge value={fu.status} />
+                          </td>
+                          <td className="px-4 py-2.5 text-right whitespace-nowrap space-x-1">
+                            {fu.status === 'Pending' && (
+                              <>
+                                <button
+                                  onClick={() => handleCompleteFollowUp(fu._id)}
+                                  className="px-2 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded text-[11px] font-bold border border-emerald-200 dark:border-emerald-800"
+                                >
+                                  Done
+                                </button>
+                                <button
+                                  onClick={() => openRescheduleModal(fu)}
+                                  className="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 rounded text-[11px] font-bold"
+                                >
+                                  Reschedule
+                                </button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Workflow History Timeline */}
+            <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
+              <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <History size={16} className="text-red-600" />
+                Workflow Stage Transition History
+              </h4>
+
+              {workflowHistory.length === 0 ? (
+                <p className="text-xs text-slate-400 italic py-2">No past transitions recorded.</p>
+              ) : (
+                <div className="space-y-2.5 pt-1">
+                  {workflowHistory.map((item, idx) => (
+                    <div
+                      key={item._id || idx}
+                      className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded border border-slate-200/60 dark:border-slate-700 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          {item.fromStage ? (
+                            <>
+                              <Badge value={item.fromStage} />
+                              <ChevronRight size={14} className="text-slate-400" />
+                              <Badge value={item.toStage} />
+                            </>
+                          ) : (
+                            <Badge value={item.toStage} />
+                          )}
+                          <span className="text-[11px] text-slate-400 font-medium">({item.action || 'Stage Transition'})</span>
+                        </div>
+                        {item.notes && (
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 italic">
+                            "{item.notes}"
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right text-[11px] text-slate-400 shrink-0">
+                        <div className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                          {new Date(item.createdAt).toLocaleDateString()}
+                        </div>
+                        <div>Changed by: <span className="font-semibold text-slate-600 dark:text-slate-400">{item.changedByName || item.changedBy?.name || 'Admin'}</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1401,6 +1791,318 @@ const StudentDetailPage = () => {
         currentBatchId={student.batch?._id || student.batch}
         onTransferSuccess={handleTransferBatch}
       />
+
+      {/* WORKFLOW STAGE TRANSITION MODAL */}
+      <Modal
+        isOpen={workflowModalOpen}
+        onClose={() => setWorkflowModalOpen(false)}
+        title={`Change Workflow Stage: ${student.fullName}`}
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleWorkflowStageSubmit} className="space-y-4 text-xs">
+          <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div>
+              <span className="text-[11px] text-slate-400 block">Current Stage</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">
+                {student.workflowStage || 'Application'}
+              </span>
+            </div>
+            <ArrowRight size={16} className="text-slate-400" />
+            <div>
+              <span className="text-[11px] text-slate-400 block">New Stage</span>
+              <span className="font-bold text-red-600 dark:text-red-400">
+                {workflowTargetStage}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Select Stage *
+            </label>
+            <select
+              value={workflowTargetStage}
+              onChange={(e) => {
+                setWorkflowTargetStage(e.target.value);
+                setWorkflowFollowUpTask(`Prepare student for ${e.target.value}`);
+              }}
+              required
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 font-bold"
+            >
+              {[
+                'Application',
+                'Documents',
+                'LL Slot / Test',
+                'LL Passed',
+                'Training',
+                'DL Test',
+                'Passed / Licence Processing',
+                'Completed',
+                'Renewal / Service',
+                'Follow Up',
+                'Other'
+              ].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Transition Notes
+            </label>
+            <textarea
+              value={workflowNotes}
+              onChange={(e) => setWorkflowNotes(e.target.value)}
+              rows={2}
+              placeholder="Notes on stage transition..."
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Next Action
+              </label>
+              <input
+                type="text"
+                value={workflowNextAction}
+                onChange={(e) => setWorkflowNextAction(e.target.value)}
+                placeholder="Next action..."
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Target Date
+              </label>
+              <input
+                type="date"
+                value={workflowNextActionDate}
+                onChange={(e) => setWorkflowNextActionDate(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100"
+              />
+            </div>
+          </div>
+
+          {/* Create follow-up toggle */}
+          <div className="p-3 bg-red-50/60 dark:bg-red-950/20 border border-red-200 dark:border-red-900/60 rounded-md space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 dark:text-slate-200">
+              <input
+                type="checkbox"
+                checked={workflowCreateFollowUp}
+                onChange={(e) => setWorkflowCreateFollowUp(e.target.checked)}
+                className="rounded text-red-600 focus:ring-red-500 h-4 w-4"
+              />
+              <span>Create follow-up reminder for this stage?</span>
+            </label>
+
+            {workflowCreateFollowUp && (
+              <div className="space-y-2 pt-2 border-t border-red-200/60">
+                <input
+                  type="text"
+                  value={workflowFollowUpTask}
+                  onChange={(e) => setWorkflowFollowUpTask(e.target.value)}
+                  placeholder="Task description"
+                  required={workflowCreateFollowUp}
+                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={workflowFollowUpDate}
+                    onChange={(e) => setWorkflowFollowUpDate(e.target.value)}
+                    required={workflowCreateFollowUp}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md"
+                  />
+                  <select
+                    value={workflowFollowUpPriority}
+                    onChange={(e) => setWorkflowFollowUpPriority(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setWorkflowModalOpen(false)}
+              className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded font-bold hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={workflowSubmitting}
+              className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-bold disabled:opacity-50"
+            >
+              {workflowSubmitting ? 'Updating...' : 'Update Stage'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ADD FOLLOW-UP MODAL */}
+      <Modal
+        isOpen={followUpModalOpen}
+        onClose={() => setFollowUpModalOpen(false)}
+        title={`Add Follow-Up for ${student.fullName}`}
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleCreateFollowUpSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Task / Action *
+            </label>
+            <input
+              type="text"
+              value={followUpTask}
+              onChange={(e) => setFollowUpTask(e.target.value)}
+              required
+              placeholder="e.g. Confirm driving test time slot"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Due Date *
+              </label>
+              <input
+                type="date"
+                value={followUpDueDate}
+                onChange={(e) => setFollowUpDueDate(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Priority
+              </label>
+              <select
+                value={followUpPriority}
+                onChange={(e) => setFollowUpPriority(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 font-semibold"
+              >
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Notes
+            </label>
+            <textarea
+              value={followUpNotes}
+              onChange={(e) => setFollowUpNotes(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setFollowUpModalOpen(false)}
+              className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded font-bold hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={followUpSubmitting}
+              className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-bold disabled:opacity-50"
+            >
+              {followUpSubmitting ? 'Saving...' : 'Save Follow-Up'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* RESCHEDULE FOLLOW-UP MODAL */}
+      <Modal
+        isOpen={rescheduleModalOpen}
+        onClose={() => setRescheduleModalOpen(false)}
+        title="Reschedule Follow-Up"
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleRescheduleSubmit} className="space-y-4 text-xs">
+          <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700">
+            <span className="text-[11px] text-slate-400 block">Task</span>
+            <span className="font-bold text-slate-800 dark:text-slate-200">{rescheduleTarget?.task}</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                New Due Date *
+              </label>
+              <input
+                type="date"
+                value={rescheduleNewDate}
+                onChange={(e) => setRescheduleNewDate(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                New Time
+              </label>
+              <input
+                type="text"
+                value={rescheduleNewTime}
+                onChange={(e) => setRescheduleNewTime(e.target.value)}
+                placeholder="10:00 AM"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Reason
+            </label>
+            <textarea
+              value={rescheduleReason}
+              onChange={(e) => setRescheduleReason(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setRescheduleModalOpen(false)}
+              className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded font-bold hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={rescheduleSubmitting}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-bold disabled:opacity-50"
+            >
+              {rescheduleSubmitting ? 'Rescheduling...' : 'Confirm Reschedule'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </MainLayout>
   );
 };

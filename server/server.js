@@ -23,6 +23,8 @@ const vehicleRoutes = require('./routes/vehicleRoutes');
 const studentDocumentRoutes = require('./routes/studentDocumentRoutes');
 const complaintRoutes = require('./routes/complaintRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
+const workflowRoutes = require('./routes/workflowRoutes');
+const followUpRoutes = require('./routes/followUpRoutes');
 
 // Connect to MongoDB Atlas
 connectDB();
@@ -59,6 +61,8 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/student-documents', studentDocumentRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/workflow', workflowRoutes);
+app.use('/api/follow-ups', followUpRoutes);
 
 // Centralized Error Handler
 app.use(errorHandler);

@@ -4,6 +4,8 @@ const Class = require('../models/Class');
 const Payment = require('../models/Payment');
 const Attendance = require('../models/Attendance');
 const StudentDocument = require('../models/StudentDocument');
+const WorkflowHistory = require('../models/WorkflowHistory');
+const FollowUp = require('../models/FollowUp');
 const generateStudentId = require('../utils/generateStudentId');
 
 // Helper to sanitize Indian mobile numbers
@@ -276,11 +278,13 @@ const getStudentDetails = async (req, res, next) => {
       throw new Error('Student not found');
     }
 
-    const [classes, payments, attendances, documents] = await Promise.all([
+    const [classes, payments, attendances, documents, workflowHistory, followUps] = await Promise.all([
       Class.find({ student: student._id }).sort({ classDate: -1 }),
       Payment.find({ student: student._id }).sort({ paymentDate: -1 }),
       Attendance.find({ student: student._id }).sort({ date: -1 }),
-      StudentDocument.find({ student: student._id }).populate('verifiedBy', 'name role').sort({ createdAt: -1 })
+      StudentDocument.find({ student: student._id }).populate('verifiedBy', 'name role').sort({ createdAt: -1 }),
+      WorkflowHistory.find({ student: student._id }).populate('changedBy', 'name role').sort({ createdAt: -1 }),
+      FollowUp.find({ student: student._id }).populate('assignedTo', 'name role').sort({ dueDate: -1 })
     ]);
 
     // Financial calculations
@@ -351,7 +355,9 @@ const getStudentDetails = async (req, res, next) => {
         balance,
         feeStatus: student.feeStatus
       },
-      documents: documents || []
+      documents: documents || [],
+      workflowHistory: workflowHistory || [],
+      followUps: followUps || []
     });
   } catch (error) {
     next(error);

@@ -5,6 +5,7 @@ const Schedule = require('../models/Schedule');
 const Enquiry = require('../models/Enquiry');
 const Payment = require('../models/Payment');
 const Expense = require('../models/Expense');
+const FollowUp = require('../models/FollowUp');
 
 // @desc    Get dashboard analytics & lists dynamically
 // @route   GET /api/dashboard/stats
@@ -151,7 +152,41 @@ const getDashboardStats = async (req, res, next) => {
     ]);
     const todaysExpensesSum = todayExpenses[0]?.total || 0;
 
-    // 9. Follow-ups (Enquiries + Students with followUpDate >= todayStart)
+    // 9. Follow-ups & Workflow Metrics
+    const [
+      pendingFollowupsCount,
+      overdueFollowupsCount,
+      activeStudentsCount,
+      studentsInTrainingCount,
+      dlTestsPendingCount,
+      upcomingFollowupsList,
+      overdueFollowupsList
+    ] = await Promise.all([
+      FollowUp.countDocuments({ status: 'Pending' }),
+      FollowUp.countDocuments({ status: 'Pending', dueDate: { $lt: todayStart } }),
+      Student.countDocuments({ currentStatus: { $nin: ['Completed', 'Dropped', 'Inactive'] } }),
+      Student.countDocuments({
+        $or: [{ workflowStage: 'Training' }, { currentStatus: 'Training' }]
+      }),
+      Student.countDocuments({
+        $or: [
+          { workflowStage: 'DL Test' },
+          { currentStatus: { $in: ['Test Pending', 'Test Scheduled', 'Retest'] } }
+        ]
+      }),
+      FollowUp.find({ status: 'Pending', dueDate: { $gte: todayStart } })
+        .populate('student', 'studentId fullName primaryMobile vehicleType')
+        .populate('assignedTo', 'name')
+        .sort({ dueDate: 1 })
+        .limit(10),
+      FollowUp.find({ status: 'Pending', dueDate: { $lt: todayStart } })
+        .populate('student', 'studentId fullName primaryMobile vehicleType')
+        .populate('assignedTo', 'name')
+        .sort({ dueDate: 1 })
+        .limit(10)
+    ]);
+
+    // Legacy fallback follow-ups
     const enquiryFollowups = await Enquiry.find({
       followUpDate: { $gte: todayStart },
       status: { $ne: 'Closed' }
@@ -164,6 +199,7 @@ const getDashboardStats = async (req, res, next) => {
     res.json({
       stats: {
         totalStudents,
+        activeStudents: activeStudentsCount,
         newEnquiries: newEnquiriesCount,
         activeBatches: activeBatchesCount,
         todaysClasses: todayClasses.length,
@@ -173,13 +209,20 @@ const getDashboardStats = async (req, res, next) => {
         todaysCollections: todaysCollectionsSum,
         todaysCash: todaysCashSum,
         todaysDigital: todaysDigitalSum,
-        todaysExpenses: todaysExpensesSum
+        todaysExpenses: todaysExpensesSum,
+        // Workflow & Follow-Up Metrics
+        pendingFollowups: pendingFollowupsCount,
+        overdueFollowups: overdueFollowupsCount,
+        studentsInTraining: studentsInTrainingCount,
+        dlTestsPending: dlTestsPendingCount
       },
       lists: {
         todayClasses,
         followUps: {
           enquiries: enquiryFollowups,
-          students: studentFollowups
+          students: studentFollowups,
+          upcoming: upcomingFollowupsList,
+          overdue: overdueFollowupsList
         },
         upcomingTests: upcomingTestsList
       }

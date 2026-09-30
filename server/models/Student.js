@@ -125,8 +125,31 @@ const studentSchema = new mongoose.Schema(
     },
     workflowStage: {
       type: String,
-      default: 'Registration'
+      default: 'Application',
+      index: true
     },
+    previousWorkflowStage: {
+      type: String,
+      default: ''
+    },
+    workflowStageChangedAt: {
+      type: Date,
+      default: Date.now
+    },
+    workflowStageChangedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    workflowAssignedStaff: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    workflowNotes: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+
 
     // Learner Licence (LL)
     learnerLicence: {

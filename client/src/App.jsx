@@ -26,6 +26,8 @@ import ComplaintDetailPage from './pages/Complaints/ComplaintDetailPage';
 import StudentLedgerPage from './pages/StudentLedger/StudentLedgerPage';
 import ExpenseListPage from './pages/Expenses/ExpenseListPage';
 import DailyCollectionPage from './pages/DailyCollection/DailyCollectionPage';
+import WorkflowPage from './pages/Workflow/WorkflowPage';
+import CalendarFollowUpPage from './pages/CalendarFollowUp/CalendarFollowUpPage';
 
 function App() {
   return (
@@ -38,6 +40,10 @@ function App() {
 
             {/* Protected Application Routes */}
             <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+
+            {/* Workflow Control & Calendar Follow-up Routes */}
+            <Route path="/workflow" element={<ProtectedRoute><WorkflowPage /></ProtectedRoute>} />
+            <Route path="/calendar-followup" element={<ProtectedRoute><CalendarFollowUpPage /></ProtectedRoute>} />
 
             {/* Student Routes */}
             <Route path="/students" element={<ProtectedRoute><StudentListPage /></ProtectedRoute>} />

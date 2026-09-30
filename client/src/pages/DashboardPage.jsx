@@ -21,7 +21,12 @@ import {
   Receipt,
   CreditCard,
   UserPlus,
-  ArrowRight
+  ArrowRight,
+  Workflow,
+  CalendarClock,
+  GraduationCap,
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 
 // Financial Donut/Pie Chart Component
@@ -371,6 +376,72 @@ const DashboardPage = () => {
               color="purple"
               subtitle="Scheduled RTO Tests"
             />
+          </div>
+
+          {/* WORKFLOW & FOLLOW-UP OPERATIONAL PIPELINE (5 METRICS) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Workflow size={14} className="text-red-600" />
+                Workflow Control & Candidate Follow-Up Pipeline
+              </h2>
+              <div className="flex items-center gap-3 text-xs">
+                <Link to="/workflow" className="font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1">
+                  Workflow Control &rarr;
+                </Link>
+                <Link to="/calendar-followup" className="font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1">
+                  Calendar / Follow-Up &rarr;
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <Link to="/students" className="block group">
+                <StatCard
+                  title="Active Students"
+                  value={stats.activeStudents || stats.totalStudents || 0}
+                  icon={Users}
+                  color="dark"
+                  subtitle="In Active Pipeline"
+                />
+              </Link>
+              <Link to="/calendar-followup" className="block group">
+                <StatCard
+                  title="Pending Follow-ups"
+                  value={stats.pendingFollowups || 0}
+                  icon={CalendarClock}
+                  color="amber"
+                  subtitle="Scheduled Tasks"
+                />
+              </Link>
+              <Link to="/calendar-followup" className="block group">
+                <StatCard
+                  title="Overdue Follow-ups"
+                  value={stats.overdueFollowups || 0}
+                  icon={AlertCircle}
+                  color="rose"
+                  subtitle="Immediate Attention"
+                />
+              </Link>
+              <Link to="/workflow?stage=Training" className="block group">
+                <StatCard
+                  title="Students in Training"
+                  value={stats.studentsInTraining || 0}
+                  icon={GraduationCap}
+                  color="purple"
+                  subtitle="Practical & Track Classes"
+                />
+              </Link>
+              <Link to="/workflow?stage=DL+Test" className="block group">
+                <StatCard
+                  title="DL Tests Pending"
+                  value={stats.dlTestsPending || 0}
+                  icon={Award}
+                  color="emerald"
+                  subtitle="Test Scheduled / Ready"
+                />
+              </Link>
+            </div>
           </div>
 
           {/* VISUAL ANALYTICS & GRAPH DASHBOARD (REPLACES QUICK ACTIONS) */}

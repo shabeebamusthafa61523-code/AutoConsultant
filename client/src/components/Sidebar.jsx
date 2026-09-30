@@ -18,7 +18,9 @@ import {
   FileCheck,
   AlertCircle,
   BookOpen,
-  TrendingDown
+  TrendingDown,
+  Workflow,
+  CalendarClock
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -30,6 +32,8 @@ const Sidebar = () => {
       title: 'MAIN NAVIGATION',
       items: [
         { label: 'Dashboard', path: '/', icon: LayoutDashboard },
+        { label: 'Workflow Control', path: '/workflow', icon: Workflow },
+        { label: 'Calendar / Follow-Up', path: '/calendar-followup', icon: CalendarClock },
         { label: 'Students', path: '/students', icon: Users },
         { label: 'Enquiries', path: '/enquiries', icon: HelpCircle }
       ]
