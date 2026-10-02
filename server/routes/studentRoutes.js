@@ -11,9 +11,15 @@ const {
   addStudentDocument,
   updateDocumentStatus,
   deleteStudent,
-  bulkImportStudents
+  bulkImportStudents,
+  checkDuplicate,
+  getStudentClassSlip,
+  globalSearch
 } = require('../controllers/studentController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+
+router.get('/check-duplicate', protect, checkDuplicate);
+router.get('/global-search', protect, globalSearch);
 
 router.route('/')
   .get(protect, getStudents)
@@ -22,6 +28,7 @@ router.route('/')
 router.post('/bulk-import', protect, bulkImportStudents);
 
 router.get('/:id/details', protect, getStudentDetails);
+router.get('/:id/class-slip', protect, getStudentClassSlip);
 
 // Status & Batch Transfer
 router.patch('/:id/status', protect, updateStudentStatus);

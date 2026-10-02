@@ -63,8 +63,15 @@ const getBatches = async (req, res, next) => {
           Schedule.countDocuments({ batch: batch._id })
         ]);
 
+        const capacity = batch.maxStudents || 20;
+        const availableSeats = Math.max(0, capacity - totalStudents);
+
         return {
           ...batch.toObject(),
+          batchId: batch.batchNumber || `BAT-${String(batch._id).slice(-4).toUpperCase()}`,
+          capacity,
+          activeStudents: totalStudents,
+          availableSeats,
           enrolledCount: totalStudents,
           activeCount: activeStudents,
           completedCount: completedStudents,
@@ -122,8 +129,16 @@ const getBatchById = async (req, res, next) => {
       })
     );
 
+    const capacity = batch.maxStudents || 20;
+    const activeStudents = students.length;
+    const availableSeats = Math.max(0, capacity - activeStudents);
+
     res.json({
       ...batch.toObject(),
+      batchId: batch.batchNumber || `BAT-${String(batch._id).slice(-4).toUpperCase()}`,
+      capacity,
+      activeStudents,
+      availableSeats,
       enrolledCount: students.length,
       students: studentsWithMetrics,
       schedules,

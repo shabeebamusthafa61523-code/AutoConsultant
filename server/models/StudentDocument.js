@@ -5,12 +5,24 @@ const studentDocumentSchema = new mongoose.Schema(
     documentId: {
       type: String,
       unique: true,
+      sparse: true,
       index: true
     },
     student: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Student',
       required: [true, 'Student reference is required'],
+      index: true
+    },
+    application: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Application',
+      default: null,
+      index: true
+    },
+    applicationId: {
+      type: String,
+      default: '',
       index: true
     },
     documentType: {
@@ -125,14 +137,54 @@ studentDocumentSchema.statics.syncStudentReadiness = async function (studentId) 
     }
   }
 
+  const verifiedCount = Object.values(readiness).filter(Boolean).length;
+  const readinessPercentage = Math.round((verifiedCount / 5) * 100);
+
   await Student.findByIdAndUpdate(studentId, {
     documentReadiness: readiness,
     documents: embeddedDocs
   });
+
+  try {
+    const Application = mongoose.model('Application');
+    await Application.updateMany(
+      { student: studentId },
+      {
+        $set: {
+          'documentReadiness.verifiedCount': verifiedCount,
+          'documentReadiness.readinessPercentage': readinessPercentage,
+          'documentReadiness.totalCount': 5
+        }
+      }
+    );
+
+    // If all essential documents are verified and lifecycle is 'Documents Pending', transition to 'LL Processing'
+    if (verifiedCount === 5) {
+      await Application.updateMany(
+        { student: studentId, lifecycleStatus: 'Documents Pending' },
+        {
+          $set: {
+            lifecycleStatus: 'LL Processing',
+            nextAction: 'Apply Learner Licence (LL)',
+            nextActionDueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+          }
+        }
+      );
+    }
+  } catch (appErr) {
+    console.warn('Application document readiness sync note:', appErr.message);
+  }
 };
 
 studentDocumentSchema.post('save', async function () {
   await this.constructor.syncStudentReadiness(this.student);
+});
+
+studentDocumentSchema.pre('validate', function (next) {
+  if (!this.documentId) {
+    this.documentId = `DOC-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+  }
+  next();
 });
 
 studentDocumentSchema.post('findOneAndDelete', async function (doc) {

@@ -18,6 +18,16 @@ const studentSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    leadSource: {
+      type: String,
+      enum: ['Walk-in', 'Referral', 'WhatsApp', 'Instagram', 'Facebook', 'Google', 'Local Campaign', 'Other'],
+      default: 'Walk-in'
+    },
+    referral: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     gender: {
       type: String,
       enum: ['Male', 'Female', 'Other'],
@@ -288,7 +298,16 @@ const studentSchema = new mongoose.Schema(
     enquiry: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Enquiry'
-    }
+    },
+    // Historical Migration Tracking
+    legacySource: { type: String, default: '' },
+    legacyId: { type: String, default: '' },
+    migrationStatus: {
+      type: String,
+      enum: ['None', 'Sample', 'Full', 'Verified'],
+      default: 'None'
+    },
+    migrationVerifiedAt: { type: Date }
   },
   {
     timestamps: true,
@@ -296,6 +315,13 @@ const studentSchema = new mongoose.Schema(
     toObject: { virtuals: true }
   }
 );
+
+// Virtual populate for applications
+studentSchema.virtual('applications', {
+  ref: 'Application',
+  localField: '_id',
+  foreignField: 'student'
+});
 
 // Virtual property for Balance
 studentSchema.virtual('balance').get(function () {

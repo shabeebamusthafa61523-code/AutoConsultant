@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from './Modal';
-import { Printer, ExternalLink, Download } from 'lucide-react';
+import { Printer, ExternalLink, Download, MessageCircle } from 'lucide-react';
 
 const ReceiptModal = ({ isOpen, onClose, payment, student }) => {
   const receiptPrintRef = useRef(null);
@@ -80,6 +80,9 @@ const ReceiptModal = ({ isOpen, onClose, payment, student }) => {
               </span>
               <p className="font-bold text-sm text-slate-900">{stu.fullName || 'Student'}</p>
               <p className="font-mono text-slate-600">ID: {stu.studentId || '—'}</p>
+              {payment.applicationId && (
+                <p className="font-mono text-slate-600">App ID: {payment.applicationId}</p>
+              )}
               <p className="text-slate-600">Mobile: {stu.primaryMobile || '—'}</p>
               <p className="text-slate-600">
                 Course: {stu.coursePackage || stu.vehicleType || 'LMV Fresh Licence'}
@@ -99,6 +102,11 @@ const ReceiptModal = ({ isOpen, onClose, payment, student }) => {
               <p className="text-slate-600">
                 Payment Mode: <strong className="font-semibold">{payment.paymentMethod || 'Cash'}</strong>
               </p>
+              {payment.receivedBy && (
+                <p className="text-slate-600">
+                  Received By: <strong className="font-semibold">{payment.receivedBy}</strong>
+                </p>
+              )}
               <p className="text-slate-600">
                 Type: <strong className="font-semibold">{payment.paymentType || 'Fee Payment'}</strong>
               </p>
@@ -118,7 +126,54 @@ const ReceiptModal = ({ isOpen, onClose, payment, student }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {isFeePayment ? (
+                {payment.feeBreakdown?.packageFee ? (
+                  <>
+                    <tr>
+                      <td className="p-2.5 text-slate-600">Package Fee</td>
+                      <td className="p-2.5 text-right font-mono font-semibold">₹ {payment.feeBreakdown.packageFee.toLocaleString('en-IN')}</td>
+                    </tr>
+                    {payment.feeBreakdown.rtoServiceFee > 0 && (
+                      <tr>
+                        <td className="p-2.5 text-slate-600">RTO / Service Fee</td>
+                        <td className="p-2.5 text-right font-mono font-semibold">₹ {payment.feeBreakdown.rtoServiceFee.toLocaleString('en-IN')}</td>
+                      </tr>
+                    )}
+                    {payment.feeBreakdown.retestFee > 0 && (
+                      <tr>
+                        <td className="p-2.5 text-slate-600">Retest Fee</td>
+                        <td className="p-2.5 text-right font-mono font-semibold">₹ {payment.feeBreakdown.retestFee.toLocaleString('en-IN')}</td>
+                      </tr>
+                    )}
+                    {payment.feeBreakdown.discount > 0 && (
+                      <tr>
+                        <td className="p-2.5 text-emerald-700 font-medium">Discount Deducted</td>
+                        <td className="p-2.5 text-right font-mono text-emerald-700 font-semibold">- ₹ {payment.feeBreakdown.discount.toLocaleString('en-IN')}</td>
+                      </tr>
+                    )}
+                    <tr className="bg-slate-50 font-bold">
+                      <td className="p-2.5 text-slate-800">Net Payable</td>
+                      <td className="p-2.5 text-right font-mono font-bold">₹ {payment.feeBreakdown.netPayable.toLocaleString('en-IN')}</td>
+                    </tr>
+                    <tr className="bg-emerald-50/60 font-bold text-slate-900">
+                      <td className="p-2.5 text-emerald-800">
+                        Amount Paid Now ({payment.paymentType || 'Receipt'})
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-base text-emerald-700 font-black">
+                        ₹ {paidAmount.toLocaleString('en-IN')}
+                      </td>
+                    </tr>
+                    <tr className="bg-slate-50 font-bold">
+                      <td className="p-2.5 text-slate-800">Remaining Balance Due</td>
+                      <td
+                        className={`p-2.5 text-right font-mono text-sm font-black ${
+                          (payment.feeBreakdown.balanceDue || remBal) > 0 ? 'text-rose-600' : 'text-emerald-600'
+                        }`}
+                      >
+                        ₹ {(payment.feeBreakdown.balanceDue !== undefined ? payment.feeBreakdown.balanceDue : remBal).toLocaleString('en-IN')}
+                      </td>
+                    </tr>
+                  </>
+                ) : isFeePayment ? (
                   <>
                     <tr>
                       <td className="p-2.5 text-slate-600">Total Enrolled Course Fee</td>
@@ -194,7 +249,7 @@ const ReceiptModal = ({ isOpen, onClose, payment, student }) => {
             <div />
           )}
 
-          <div className="flex gap-2.5">
+          <div className="flex flex-wrap gap-2.5">
             <button
               type="button"
               onClick={onClose}
@@ -202,10 +257,24 @@ const ReceiptModal = ({ isOpen, onClose, payment, student }) => {
             >
               Close
             </button>
+            {stu.primaryMobile && (
+              <a
+                href={`https://wa.me/${(stu.primaryMobile || '').replace(/\D/g, '').length === 10 ? '91' + (stu.primaryMobile || '').replace(/\D/g, '') : (stu.primaryMobile || '').replace(/\D/g, '')}?text=${encodeURIComponent(
+                  `Dear ${stu.fullName || 'Candidate'}, your payment of ₹${paidAmount} has been successfully recorded at BENZ Auto Consultant (Receipt No: ${receiptNumber}, Mode: ${payment.paymentMethod || 'Cash'}). Remaining Balance: ₹${remBal}. Thank you!`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-md transition flex items-center gap-1.5 shadow-sm"
+                title="Send Official Receipt via WhatsApp"
+              >
+                <MessageCircle size={15} />
+                <span>WhatsApp Receipt</span>
+              </a>
+            )}
             <button
               type="button"
               onClick={handlePrintReceipt}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-md transition flex items-center gap-1.5 shadow-sm"
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-md transition flex items-center gap-1.5 shadow-sm"
               title="Print or Save Receipt as PDF"
             >
               <Printer size={15} />

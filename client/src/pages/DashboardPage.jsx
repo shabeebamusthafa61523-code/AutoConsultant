@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import Navbar from '../components/Navbar';
 import StatCard from '../components/StatCard';
@@ -21,7 +21,15 @@ import {
   Receipt,
   CreditCard,
   UserPlus,
-  ArrowRight
+  ArrowRight,
+  ChevronRight,
+  Flame,
+  ShieldAlert,
+  Sparkles,
+  Filter,
+  CheckCircle2,
+  FileCheck,
+  AlertTriangle
 } from 'lucide-react';
 
 // Financial Donut/Pie Chart Component
@@ -190,9 +198,12 @@ const OperationalBarChart = ({ stats }) => {
 };
 
 const DashboardPage = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [kpiCategory, setKpiCategory] = useState('today');
+  const [commandTab, setCommandTab] = useState('nextActionsOverdue');
 
   const fetchStats = async () => {
     try {
@@ -212,6 +223,8 @@ const DashboardPage = () => {
   }, []);
 
   const stats = data?.stats || {};
+  const managementKPI = data?.managementKPI || {};
+  const todayCommandCentre = data?.todayCommandCentre || {};
   const lists = data?.lists || {};
 
   // Columns for Today's Scheduled Driving Classes table
@@ -313,64 +326,207 @@ const DashboardPage = () => {
             </div>
           </div>
 
-          {/* DYNAMIC EXECUTIVE STAT CARDS (8 CARDS) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              title="Today's Collections"
-              value={`₹ ${(stats.todaysCollections || 0).toLocaleString('en-IN')}`}
-              icon={DollarSign}
-              color="emerald"
-              subtitle="Live Cash & Digital Receipts"
-            />
-            <StatCard
-              title="Today's Expenditure"
-              value={`₹ ${(stats.todaysExpenses || 0).toLocaleString('en-IN')}`}
-              icon={TrendingDown}
-              color="rose"
-              subtitle="Operational Expenses"
-            />
-            <StatCard
-              title="Total Enrolled Students"
-              value={stats.totalStudents || 0}
-              icon={Users}
-              color="red"
-              subtitle="Active & Historical Candidates"
-            />
-            <StatCard
-              title="Pending Student Fees"
-              value={stats.pendingPayments || 0}
-              icon={AlertCircle}
-              color="amber"
-              subtitle="Candidates with due balance"
-            />
-            <StatCard
-              title="Active Training Batches"
-              value={stats.activeBatches || 0}
-              icon={Layers}
-              color="dark"
-              subtitle="Ongoing Batches"
-            />
-            <StatCard
-              title="Today's Classes"
-              value={stats.todaysClasses || 0}
-              icon={Calendar}
-              color="emerald"
-              subtitle="Practical & Theory sessions"
-            />
-            <StatCard
-              title="New Enquiries"
-              value={stats.newEnquiries || 0}
-              icon={HelpCircle}
-              color="amber"
-              subtitle="Fresh Prospects"
-            />
-            <StatCard
-              title="Upcoming Driving Tests"
-              value={stats.upcomingTests || 0}
-              icon={Award}
-              color="purple"
-              subtitle="Scheduled RTO Tests"
-            />
+          {/* ========================================================================= */}
+          {/* R&D GUIDE: CATEGORIZED MANAGEMENT KPIS */}
+          {/* ========================================================================= */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
+              <h3 className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles size={14} className="text-red-600" />
+                Management Dashboard Categorized KPIs
+              </h3>
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                {[
+                  { id: 'today', label: 'Today KPIs' },
+                  { id: 'operations', label: 'Operations' },
+                  { id: 'finance', label: 'Finance' },
+                  { id: 'alerts', label: 'Alerts' }
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setKpiCategory(cat.id)}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition ${
+                      kpiCategory === cat.id
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Category 1: Today KPIs */}
+            {kpiCategory === 'today' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                <StatCard
+                  title="Today's Admissions"
+                  value={managementKPI.today?.newAdmissions ?? 0}
+                  icon={UserPlus}
+                  color="red"
+                  subtitle="New Candidate Enrolments"
+                />
+                <StatCard
+                  title="Today's Collections"
+                  value={`₹ ${(managementKPI.today?.todaysCollection ?? stats.todaysCollections ?? 0).toLocaleString('en-IN')}`}
+                  icon={DollarSign}
+                  color="emerald"
+                  subtitle="Cash & Digital Receipts"
+                />
+                <StatCard
+                  title="Today's Training"
+                  value={managementKPI.today?.todaysTraining ?? stats.todaysClasses ?? 0}
+                  icon={Calendar}
+                  color="blue"
+                  subtitle="Active Practical Sessions"
+                />
+                <StatCard
+                  title="Today's RTO Tests"
+                  value={managementKPI.today?.todaysRtoTests ?? 0}
+                  icon={Award}
+                  color="purple"
+                  subtitle="Tests Scheduled Today"
+                />
+                <StatCard
+                  title="Pending Documents"
+                  value={managementKPI.today?.pendingDocuments ?? 0}
+                  icon={FileCheck}
+                  color="amber"
+                  subtitle="Candidates Awaiting KYC"
+                />
+                <StatCard
+                  title="Total Fee Balance"
+                  value={`₹ ${(managementKPI.today?.outstandingBalance ?? stats.totalPendingAmount ?? 0).toLocaleString('en-IN')}`}
+                  icon={AlertCircle}
+                  color="rose"
+                  subtitle="Outstanding Dues"
+                />
+              </div>
+            )}
+
+            {/* Category 2: Operations Pipeline */}
+            {kpiCategory === 'operations' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                <StatCard
+                  title="Active Applications"
+                  value={managementKPI.operations?.activeStudents ?? stats.activeApplications ?? stats.totalStudents ?? 0}
+                  icon={Users}
+                  color="red"
+                  subtitle="In Progress Pipeline"
+                />
+                <StatCard
+                  title="In Training"
+                  value={managementKPI.operations?.trainingStudents ?? 0}
+                  icon={Layers}
+                  color="blue"
+                  subtitle="Practical & Theory"
+                />
+                <StatCard
+                  title="Test Ready"
+                  value={managementKPI.operations?.testReady ?? 0}
+                  icon={CheckCircle2}
+                  color="emerald"
+                  subtitle="Quota Completed"
+                />
+                <StatCard
+                  title="LL Pending"
+                  value={managementKPI.operations?.llPending ?? 0}
+                  icon={Clock}
+                  color="amber"
+                  subtitle="Parivahan Processing"
+                />
+                <StatCard
+                  title="Retest Pending"
+                  value={managementKPI.operations?.retestPending ?? 0}
+                  icon={AlertTriangle}
+                  color="rose"
+                  subtitle="Requires Rescheduling"
+                />
+                <StatCard
+                  title="Licence Processing"
+                  value={managementKPI.operations?.licencePending ?? 0}
+                  icon={Award}
+                  color="purple"
+                  subtitle="Awaiting DL Dispatch"
+                />
+              </div>
+            )}
+
+            {/* Category 3: Finance Ledger */}
+            {kpiCategory === 'finance' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <StatCard
+                  title="Total Course Fees"
+                  value={`₹ ${(managementKPI.finance?.totalFees ?? 0).toLocaleString('en-IN')}`}
+                  icon={DollarSign}
+                  color="dark"
+                  subtitle="Cumulative Ledger"
+                />
+                <StatCard
+                  title="Total Collected"
+                  value={`₹ ${(managementKPI.finance?.collected ?? 0).toLocaleString('en-IN')}`}
+                  icon={CreditCard}
+                  color="emerald"
+                  subtitle="Recorded Payments"
+                />
+                <StatCard
+                  title="Outstanding Dues"
+                  value={`₹ ${(managementKPI.finance?.outstanding ?? 0).toLocaleString('en-IN')}`}
+                  icon={AlertCircle}
+                  color="rose"
+                  subtitle="Pending Recovery"
+                />
+                <StatCard
+                  title="Today's Collection"
+                  value={`₹ ${(managementKPI.finance?.todaysCollection ?? stats.todaysCollections ?? 0).toLocaleString('en-IN')}`}
+                  icon={Receipt}
+                  color="blue"
+                  subtitle="Daily Receipt Volume"
+                />
+                <StatCard
+                  title="This Month"
+                  value={`₹ ${(managementKPI.finance?.thisMonthsCollection ?? 0).toLocaleString('en-IN')}`}
+                  icon={TrendingDown}
+                  color="purple"
+                  subtitle="Current Month Gross"
+                />
+              </div>
+            )}
+
+            {/* Category 4: Operational Alerts */}
+            {kpiCategory === 'alerts' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <StatCard
+                  title="Overdue Balances"
+                  value={managementKPI.alerts?.overdueBalances ?? stats.pendingPayments ?? 0}
+                  icon={AlertCircle}
+                  color="rose"
+                  subtitle="Due Payment Candidates"
+                />
+                <StatCard
+                  title="Incomplete KYC"
+                  value={managementKPI.alerts?.incompleteDocuments ?? 0}
+                  icon={FileCheck}
+                  color="amber"
+                  subtitle="Pending Form 15 / Aadhaar"
+                />
+                <StatCard
+                  title="Overdue Next Actions"
+                  value={managementKPI.alerts?.overdueNextActions ?? 0}
+                  icon={Clock}
+                  color="red"
+                  subtitle="Action Date Passed"
+                />
+                <StatCard
+                  title="Upcoming RTO Tests"
+                  value={managementKPI.alerts?.upcomingTests ?? stats.upcomingTests ?? 0}
+                  icon={Award}
+                  color="purple"
+                  subtitle="Requires Ground Prep"
+                />
+              </div>
+            )}
           </div>
 
           {/* VISUAL ANALYTICS & GRAPH DASHBOARD (REPLACES QUICK ACTIONS) */}
@@ -430,6 +586,124 @@ const DashboardPage = () => {
               </Link>
             </div>
           </div>
+
+          {/* ========================================================================= */}
+          {/* R&D GUIDE: TODAY COMMAND CENTRE (OFFICE ACTION DESK) */}
+          {/* ========================================================================= */}
+          {(() => {
+            const currentCommandList =
+              commandTab === 'trainingToday'
+                ? todayCommandCentre.trainingToday || []
+                : commandTab === 'rtoTestsToday'
+                ? todayCommandCentre.rtoTestsToday || []
+                : commandTab === 'paymentFollowups'
+                ? todayCommandCentre.paymentFollowups || []
+                : commandTab === 'documentsPending'
+                ? todayCommandCentre.documentsPending || []
+                : todayCommandCentre.nextActionsOverdue || [];
+
+            return (
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 dark:border-slate-700 pb-3">
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base flex items-center gap-2">
+                      <Flame size={18} className="text-red-600" />
+                      Today Command Centre (Daily Operating Rhythm)
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Actionable office desk lists across training, RTO tests, follow-ups, and compliance with direct student access.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Command Centre Tabs Ribbon */}
+                <div className="flex overflow-x-auto gap-1 border-b border-slate-200 dark:border-slate-700 pb-1">
+                  {[
+                    { id: 'nextActionsOverdue', label: 'Overdue Next Actions', count: todayCommandCentre.nextActionsOverdue?.length || 0 },
+                    { id: 'trainingToday', label: 'Training Today', count: todayCommandCentre.trainingToday?.length || 0 },
+                    { id: 'rtoTestsToday', label: 'RTO Tests Today', count: todayCommandCentre.rtoTestsToday?.length || 0 },
+                    { id: 'paymentFollowups', label: 'Payment Follow-ups', count: todayCommandCentre.paymentFollowups?.length || 0 },
+                    { id: 'documentsPending', label: 'Documents Pending', count: todayCommandCentre.documentsPending?.length || 0 }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setCommandTab(tab.id)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition flex items-center gap-1.5 ${
+                        commandTab === tab.id
+                          ? 'bg-red-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      <span>{tab.label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                        commandTab === tab.id ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                      }`}>
+                        {tab.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Tab Items List */}
+                {currentCommandList.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-400">
+                    No items in this queue today. All tasks are up to date!
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-700/60 max-h-96 overflow-y-auto">
+                    {currentCommandList.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="py-3 px-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-700/40 rounded transition"
+                      >
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                              {item.studentName}
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-1.5 py-0.2 rounded border border-red-200 dark:border-red-900/50">
+                              {item.studentId}
+                            </span>
+                            {item.priority && (
+                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                                item.priority === 'Urgent' || item.priority === 'High'
+                                  ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                              }`}>
+                                {item.priority}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                            {item.action}
+                          </p>
+                          <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                            <span>Due: <strong>{item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'Today'}</strong></span>
+                            <span>&bull;</span>
+                            <span>Assigned: <strong>{item.assignedPerson || 'Office Staff'}</strong></span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {item.studentMongoId ? (
+                            <button
+                              onClick={() => navigate(`/students/${item.studentMongoId}`)}
+                              className="px-3 py-1 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 text-xs font-bold rounded-md border border-red-200 dark:border-red-800 transition flex items-center gap-1 shadow-2xs"
+                            >
+                              <span>Open Student</span>
+                              <ChevronRight size={13} />
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">Batch Event</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* TODAY'S SCHEDULED CLASSES SECTION */}
           <div className="bg-white dark:bg-slate-800 p-5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">

@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage';
 import StudentListPage from './pages/Students/StudentListPage';
 import StudentFormPage from './pages/Students/StudentFormPage';
 import StudentDetailPage from './pages/Students/StudentDetailPage';
+import ApplicationListPage from './pages/Applications/ApplicationListPage';
 import WorkflowControlPage from './pages/Workflow/WorkflowControlPage';
 import CalendarFollowUpPage from './pages/Calendar/CalendarFollowUpPage';
 import BatchListPage from './pages/Batches/BatchListPage';
@@ -30,6 +31,7 @@ import StudentLedgerPage from './pages/StudentLedger/StudentLedgerPage';
 import ExpenseListPage from './pages/Expenses/ExpenseListPage';
 import DailyCollectionPage from './pages/DailyCollection/DailyCollectionPage';
 import RefundCreditDebitPage from './pages/Financials/RefundCreditDebitPage';
+import ReportsPage from './pages/Reports/ReportsPage';
 
 function App() {
   return (
@@ -48,6 +50,7 @@ function App() {
             <Route path="/students/add" element={<ProtectedRoute><StudentFormPage /></ProtectedRoute>} />
             <Route path="/students/:id" element={<ProtectedRoute><StudentDetailPage /></ProtectedRoute>} />
             <Route path="/students/:id/edit" element={<ProtectedRoute><StudentFormPage /></ProtectedRoute>} />
+            <Route path="/applications" element={<ProtectedRoute><ApplicationListPage /></ProtectedRoute>} />
             <Route path="/workflow" element={<ProtectedRoute><WorkflowControlPage /></ProtectedRoute>} />
             <Route path="/calendar" element={<ProtectedRoute><CalendarFollowUpPage /></ProtectedRoute>} />
 
@@ -91,6 +94,9 @@ function App() {
             {/* Services & Course Package Routes */}
             <Route path="/services" element={<ProtectedRoute><ServicesPage /></ProtectedRoute>} />
             <Route path="/course-fees" element={<ProtectedRoute><ServicesPage /></ProtectedRoute>} />
+
+            {/* Reports Route */}
+            <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
 
             {/* Users Route */}
             <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />

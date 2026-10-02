@@ -1,11 +1,14 @@
 const Student = require('../models/Student');
+const Application = require('../models/Application');
 const Batch = require('../models/Batch');
 const Class = require('../models/Class');
 const Payment = require('../models/Payment');
 const Attendance = require('../models/Attendance');
 const StudentDocument = require('../models/StudentDocument');
 const Counter = require('../models/Counter');
+const AuditLog = require('../models/AuditLog');
 const generateStudentId = require('../utils/generateStudentId');
+const generateApplicationId = require('../utils/generateApplicationId');
 
 // Helper to sanitize Indian mobile numbers
 const cleanPhone = (val) => {
@@ -18,6 +21,80 @@ const cleanPhone = (val) => {
     digits = digits.slice(2);
   }
   return digits;
+};
+
+// Check for possible duplicate students across Mobile, Alternate Mobile, and Name+Mobile
+const checkDuplicateStudent = async ({ mobile, alternateMobile, fullName, excludeId }) => {
+  const cleanedPrimary = cleanPhone(mobile);
+  const cleanedAlt = cleanPhone(alternateMobile);
+
+  const queryOr = [];
+  if (cleanedPrimary) {
+    queryOr.push({ primaryMobile: cleanedPrimary });
+    queryOr.push({ alternateMobile: cleanedPrimary });
+  }
+  if (cleanedAlt) {
+    queryOr.push({ primaryMobile: cleanedAlt });
+    queryOr.push({ alternateMobile: cleanedAlt });
+  }
+  if (fullName && cleanedPrimary) {
+    queryOr.push({
+      fullName: new RegExp(`^${fullName.trim()}$`, 'i'),
+      primaryMobile: cleanedPrimary
+    });
+  }
+
+  if (queryOr.length === 0) return null;
+
+  const matchQuery = { $or: queryOr };
+  if (excludeId) matchQuery._id = { $ne: excludeId };
+
+  return await Student.findOne(matchQuery).select('studentId fullName primaryMobile alternateMobile currentStatus');
+};
+
+// Helper to ensure existing students have an Application record
+const ensureStudentApplication = async (student) => {
+  if (!student) return null;
+  let app = await Application.findOne({ student: student._id }).sort({ createdAt: -1 });
+  if (!app) {
+    const appId = await generateApplicationId();
+    const pkgFee = student.totalFee || 9000;
+    const paid = (student.paidAmount || 0) + (student.advanceAmount || 0);
+    app = await Application.create({
+      applicationId: appId,
+      student: student._id,
+      studentId: student.studentId,
+      serviceType: student.licenceServiceType || 'Fresh Licence',
+      licenceType: student.licenceCategory || 'LMV',
+      vehicleClass: student.vehicleType || '4 Wheeler',
+      coursePackage: student.coursePackage || 'LMV+MCWG (Fresh Licence)',
+      applicationDate: student.registrationDate || student.createdAt || new Date(),
+      lifecycleStatus: student.currentStatus || 'Registered',
+      batch: student.batch || null,
+      feeStructure: {
+        packageFee: pkgFee,
+        rtoServiceFee: 0,
+        retestFee: 0,
+        otherCharges: 0,
+        discount: 0,
+        netPayable: pkgFee,
+        totalReceived: paid,
+        balanceDue: Math.max(0, pkgFee - paid)
+      },
+      nextAction: student.nextAction || 'Verify Documents',
+      nextActionDueDate: student.followUpDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      nextActionPriority: 'Medium',
+      nextActionStatus: 'Pending',
+      learnerLicence: student.learnerLicence || {},
+      drivingTest: {
+        drivingTestDate: student.testDate,
+        testResult: student.testStatus === 'Passed' ? 'Passed' : (student.testStatus === 'Failed' ? 'Failed' : 'Pending')
+      },
+      licence: student.drivingLicence || {},
+      migrationStatus: 'Verified'
+    });
+  }
+  return app;
 };
 
 // Comprehensive server-side validation helper
@@ -39,7 +116,7 @@ const validateStudentInput = async (data, isUpdate = false, currentStudentId = n
       const cleaned = cleanPhone(data.primaryMobile);
       if (!/^[6-9]\d{9}$/.test(cleaned)) {
         errors.push('Primary mobile must be a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.');
-      } else if (!isUpdate) {
+      } else if (!isUpdate && !data.confirmDuplicate) {
         // Check for duplicate mobile number for active students
         const existing = await Student.findOne({
           primaryMobile: cleaned,
@@ -277,12 +354,31 @@ const getStudentDetails = async (req, res, next) => {
       throw new Error('Student not found');
     }
 
-    const [classes, payments, attendances, documents] = await Promise.all([
+    await ensureStudentApplication(student);
+
+    const userApplications = await Application.find({ student: student._id })
+      .populate('batch', 'name startTime endTime')
+      .populate('primaryInstructor', 'name mobile')
+      .populate('assignedVehicle', 'vehicleNumber')
+      .sort({ createdAt: -1 });
+
+    const appIds = userApplications.map(a => a.applicationId).filter(Boolean);
+
+    const [classes, payments, attendances, documents, auditTimeline] = await Promise.all([
       Class.find({ student: student._id }).sort({ classDate: -1 }),
       Payment.find({ student: student._id }).sort({ paymentDate: -1 }),
       Attendance.find({ student: student._id }).sort({ date: -1 }),
-      StudentDocument.find({ student: student._id }).populate('verifiedBy', 'name role').sort({ createdAt: -1 })
+      StudentDocument.find({ student: student._id }).populate('verifiedBy', 'name role').sort({ createdAt: -1 }),
+      AuditLog.find({
+        $or: [
+          { entityId: student.studentId },
+          { entityId: String(student._id) },
+          { entityId: { $in: appIds } },
+          { 'details.studentId': student.studentId }
+        ]
+      }).sort({ timestamp: -1 }).limit(50)
     ]);
+    const applications = userApplications;
 
     // Financial calculations
     const totalPaymentsReceived = payments.reduce((acc, curr) => acc + (curr.amount || 0), 0);
@@ -316,6 +412,8 @@ const getStudentDetails = async (req, res, next) => {
       classes,
       payments,
       attendance: attendances,
+      applications: applications || [],
+      timeline: auditTimeline && auditTimeline.length > 0 ? auditTimeline : student.timeline,
       stats: {
         attendance: {
           total: totalAttendanceSessions,
@@ -363,6 +461,28 @@ const getStudentDetails = async (req, res, next) => {
 // @route   POST /api/students
 const createStudent = async (req, res, next) => {
   try {
+    // 1. Check for duplicate student unless user confirmed duplicate
+    if (!req.body.confirmDuplicate) {
+      const duplicate = await checkDuplicateStudent({
+        mobile: req.body.primaryMobile,
+        alternateMobile: req.body.alternateMobile,
+        fullName: req.body.fullName
+      });
+      if (duplicate) {
+        return res.status(409).json({
+          isDuplicate: true,
+          message: 'Possible Existing Student found in system',
+          duplicateStudent: {
+            _id: duplicate._id,
+            studentId: duplicate.studentId,
+            fullName: duplicate.fullName,
+            primaryMobile: duplicate.primaryMobile,
+            currentStatus: duplicate.currentStatus
+          }
+        });
+      }
+    }
+
     const errors = await validateStudentInput(req.body, false);
     if (errors.length > 0) {
       res.status(400);
@@ -427,6 +547,8 @@ const createStudent = async (req, res, next) => {
       studentId,
       fullName: req.body.fullName.trim(),
       aliasSourceName: req.body.aliasSourceName ? req.body.aliasSourceName.trim() : '',
+      leadSource: req.body.leadSource || 'Walk-in',
+      referral: req.body.referral ? req.body.referral.trim() : '',
       primaryMobile: cleanPrimaryMobile,
       alternateMobile: cleanAlternateMobile,
       totalFee: totalFeeNum,
@@ -443,8 +565,89 @@ const createStudent = async (req, res, next) => {
     };
 
     const student = await Student.create(studentData);
-    const populatedStudent = await Student.findById(student._id).populate('batch');
 
+    // 2. Automatically create initial Application record
+    const appId = await generateApplicationId();
+    const netPayable = totalFeeNum;
+    const initialReceived = paidAmountNum + advanceAmountNum;
+
+    const application = await Application.create({
+      applicationId: appId,
+      student: student._id,
+      studentId: student.studentId,
+      serviceType: req.body.licenceServiceType || req.body.serviceType || 'Fresh Licence',
+      licenceType: req.body.licenceCategory || 'LMV+MCWG',
+      vehicleClass: req.body.vehicleType || '4 Wheeler',
+      coursePackage: req.body.coursePackage || 'LMV+MCWG (Fresh Licence)',
+      applicationDate: studentData.registrationDate,
+      lifecycleStatus: req.body.workflowStage || req.body.currentStatus || 'Registered',
+      batch: studentData.batch || null,
+      feeStructure: {
+        packageFee: totalFeeNum,
+        rtoServiceFee: 0,
+        retestFee: 0,
+        otherCharges: 0,
+        discount: 0,
+        netPayable,
+        totalReceived: initialReceived,
+        balanceDue: Math.max(0, netPayable - initialReceived)
+      },
+      nextAction: req.body.nextAction || 'Submit Documents',
+      nextActionDueDate: req.body.followUpDate ? new Date(req.body.followUpDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      nextActionAssignedTo: 'Office Desk',
+      nextActionPriority: req.body.nextActionPriority || 'Medium',
+      nextActionStatus: 'Pending',
+      notes: req.body.notes || ''
+    });
+
+    // 3. Create initial Payment transaction if initial deposit was made
+    if (initialReceived > 0) {
+      const counter = await Counter.findByIdAndUpdate(
+        { _id: 'receiptNo' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      const receiptNo = `BENZ-REC-${String(counter.seq).padStart(4, '0')}`;
+      const initAmount = initialReceived;
+      const initType = paidAmountNum > 0 ? 'Fee Payment' : 'Advance Payment';
+
+      await Payment.create({
+        receiptNo,
+        student: student._id,
+        application: application._id,
+        applicationId: application.applicationId,
+        receivedBy: req.user ? req.user.name : 'Office Staff',
+        amount: initAmount,
+        paymentType: initType,
+        paymentMethod: 'Cash',
+        previousBalance: netPayable,
+        balanceAfter: Math.max(0, netPayable - initAmount),
+        feeBreakdown: {
+          packageFee: totalFeeNum,
+          netPayable,
+          totalReceived: initAmount,
+          balanceDue: Math.max(0, netPayable - initAmount)
+        },
+        status: 'Completed',
+        recordedBy: req.user ? req.user._id : null
+      });
+    }
+
+    // 4. Record creation in central AuditLog
+    await AuditLog.logAction({
+      user: req.user,
+      action: 'Student Created',
+      entity: 'Student',
+      entityId: student.studentId,
+      details: {
+        studentId: student.studentId,
+        fullName: student.fullName,
+        applicationId: application.applicationId
+      },
+      req
+    });
+
+    const populatedStudent = await Student.findById(student._id).populate('batch');
     res.status(201).json(populatedStudent);
   } catch (error) {
     next(error);
@@ -852,6 +1055,36 @@ const bulkImportStudents = async (req, res, next) => {
         ]
       });
 
+      // Auto-create initial Application for imported student
+      const appId = await generateApplicationId();
+      const app = await Application.create({
+        applicationId: appId,
+        student: newStudent._id,
+        studentId: newStudent.studentId,
+        serviceType: 'Fresh Licence',
+        licenceType: newStudent.licenceCategory || 'LMV',
+        vehicleClass: newStudent.vehicleType || '4 Wheeler',
+        coursePackage: newStudent.coursePackage || 'LMV+MCWG (Fresh Licence)',
+        applicationDate: newStudent.registrationDate || new Date(),
+        lifecycleStatus: newStudent.currentStatus || 'Registered',
+        batch: batchId || null,
+        feeStructure: {
+          packageFee: totalFee,
+          rtoServiceFee: 0,
+          retestFee: 0,
+          otherCharges: 0,
+          discount: 0,
+          netPayable: totalFee,
+          totalReceived: paidAmount + advanceAmount,
+          balanceDue: Math.max(0, totalFee - paidAmount - advanceAmount)
+        },
+        nextAction: 'Verify Bulk Admission',
+        nextActionDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        nextActionPriority: 'Medium',
+        nextActionStatus: 'Pending',
+        notes: 'Imported via Bulk Intake Hub'
+      });
+
       // If initial payment was included in import, create Payment record
       if (paidAmount > 0) {
         const counter = await Counter.findByIdAndUpdate(
@@ -859,16 +1092,24 @@ const bulkImportStudents = async (req, res, next) => {
           { $inc: { seq: 1 } },
           { new: true, upsert: true }
         );
-        const receiptNo = `REC-${String(counter.seq).padStart(4, '0')}`;
+        const receiptNo = `BENZ-REC-${String(counter.seq).padStart(4, '0')}`;
 
         await Payment.create({
           receiptNo,
           student: newStudent._id,
+          application: app._id,
+          applicationId: app.applicationId,
           amount: paidAmount,
           paymentType: 'Fee Payment',
           paymentMethod: 'Cash',
           previousBalance: totalFee,
           balanceAfter: Math.max(0, totalFee - paidAmount - advanceAmount),
+          feeBreakdown: {
+            packageFee: totalFee,
+            netPayable: totalFee,
+            totalReceived: paidAmount,
+            balanceDue: Math.max(0, totalFee - paidAmount)
+          },
           status: 'Completed',
           notes: 'Initial Payment from Bulk Import',
           recordedBy: req.user ? req.user._id : null
@@ -891,6 +1132,196 @@ const bulkImportStudents = async (req, res, next) => {
   }
 };
 
+// @desc    Check duplicate student before creation
+// @route   GET /api/students/check-duplicate
+const checkDuplicate = async (req, res, next) => {
+  try {
+    const { mobile, alternateMobile, fullName } = req.query;
+    const existing = await checkDuplicateStudent({ mobile, alternateMobile, fullName });
+    if (existing) {
+      return res.json({
+        isDuplicate: true,
+        message: 'Possible Existing Student found in system',
+        duplicateStudent: existing
+      });
+    }
+    res.json({ isDuplicate: false });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get student class slip data for printing / download
+// @route   GET /api/students/:id/class-slip
+const getStudentClassSlip = async (req, res, next) => {
+  try {
+    const student = await Student.findById(req.params.id).populate('batch');
+    if (!student) {
+      res.status(404);
+      throw new Error('Student not found');
+    }
+
+    const app = await Application.findOne({ student: student._id }).sort({ createdAt: -1 })
+      .populate('primaryInstructor', 'name mobile')
+      .populate('assignedVehicle', 'vehicleNumber');
+
+    const classes = await Class.find({
+      student: student._id,
+      status: { $ne: 'Cancelled' }
+    }).sort({ classDate: 1 });
+
+    const roadClasses = [];
+    const hPracticeClasses = [];
+    let totalKm = 0;
+    let totalHPractices = 0;
+
+    classes.forEach((c) => {
+      const type = (c.trainingType || '').toLowerCase();
+      const km = Number(c.kmDriven || c.km || 0);
+      const hCount = Number(c.hPracticeCount || (type.includes('h') ? 1 : 0));
+
+      if (km > 0 || type.includes('road')) {
+        totalKm += km;
+        roadClasses.push({
+          date: c.classDate,
+          instructor: c.instructor || app?.primaryInstructor?.name || 'Instructor',
+          kmStart: c.kmStart || 0,
+          kmEnd: c.kmEnd || (c.kmStart ? c.kmStart + km : km),
+          kmDriven: km,
+          duration: c.duration || (c.hours ? c.hours * 60 : 60),
+          vehicle: c.vehicleNo || 'KL-10-AB-5265',
+          remarks: c.notes || ''
+        });
+      }
+
+      if (hCount > 0 || type.includes('h') || type.includes('track')) {
+        totalHPractices += hCount;
+        hPracticeClasses.push({
+          date: c.classDate,
+          instructor: c.instructor || app?.primaryInstructor?.name || 'Instructor',
+          hPracticeCount: hCount,
+          duration: c.duration || (c.hours ? c.hours * 60 : 60),
+          remarks: c.notes || ''
+        });
+      }
+    });
+
+    // Exact R&D Calculation: 5 KM road driving = 1 Road Class, 3 H practices = 1 H Class
+    const calcRoadClasses = Math.floor(totalKm / 5);
+    const calcHClasses = Math.floor(totalHPractices / 3);
+    const totalClasses = calcRoadClasses + calcHClasses;
+
+    res.json({
+      success: true,
+      data: {
+        student: {
+          name: student.fullName,
+          studentId: student.studentId,
+          mobile: student.primaryMobile,
+          vehicleType: student.vehicleType,
+          coursePackage: student.coursePackage
+        },
+        application: {
+          applicationId: app?.applicationId || '',
+          serviceType: app?.serviceType || 'Fresh Licence',
+          instructor: app?.primaryInstructor?.name || 'Assigned Instructor'
+        },
+        roadTraining: roadClasses,
+        hPractice: hPracticeClasses,
+        summary: {
+          totalKm,
+          roadClasses: calcRoadClasses,
+          totalHPractices,
+          hClasses: calcHClasses,
+          totalClasses
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Global search across Name, Mobile, Student ID, Application No, LL No, DL No
+// @route   GET /api/students/global-search
+const globalSearch = async (req, res, next) => {
+  try {
+    const { q } = req.query;
+    if (!q || !q.trim()) {
+      return res.json({ success: true, results: [] });
+    }
+
+    const term = q.trim();
+    const regex = new RegExp(term, 'i');
+
+    const matchingStudents = await Student.find({
+      $or: [
+        { fullName: regex },
+        { primaryMobile: regex },
+        { alternateMobile: regex },
+        { studentId: regex }
+      ]
+    }).limit(10);
+
+    const studentIds = matchingStudents.map((s) => s._id);
+
+    const matchingApps = await Application.find({
+      $or: [
+        { applicationId: regex },
+        { 'learnerLicence.llNumber': regex },
+        { 'licence.dlNumber': regex },
+        { student: { $in: studentIds } }
+      ]
+    })
+      .populate('student')
+      .limit(10);
+
+    const results = [];
+    const seenStudentIds = new Set();
+
+    matchingApps.forEach((app) => {
+      if (app.student) {
+        seenStudentIds.add(String(app.student._id));
+        results.push({
+          studentName: app.student.fullName,
+          mobile: app.student.primaryMobile,
+          studentId: app.student.studentId,
+          applicationId: app.applicationId,
+          currentStatus: app.lifecycleStatus,
+          balance: app.feeStructure?.balanceDue ?? app.student.balance,
+          nextAction: app.nextAction || 'N/A',
+          studentMongoId: app.student._id,
+          applicationMongoId: app._id
+        });
+      }
+    });
+
+    matchingStudents.forEach((stu) => {
+      if (!seenStudentIds.has(String(stu._id))) {
+        seenStudentIds.add(String(stu._id));
+        results.push({
+          studentName: stu.fullName,
+          mobile: stu.primaryMobile,
+          studentId: stu.studentId,
+          applicationId: 'N/A',
+          currentStatus: stu.currentStatus,
+          balance: stu.balance,
+          nextAction: stu.nextAction || 'N/A',
+          studentMongoId: stu._id,
+          applicationMongoId: null
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      results
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStudents,
   getStudentById,
@@ -902,5 +1333,8 @@ module.exports = {
   addStudentDocument,
   updateDocumentStatus,
   deleteStudent,
-  bulkImportStudents
+  bulkImportStudents,
+  checkDuplicate,
+  getStudentClassSlip,
+  globalSearch
 };
