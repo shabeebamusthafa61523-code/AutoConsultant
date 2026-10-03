@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import MainLayout from '../../layouts/MainLayout';
 import Navbar from '../../components/Navbar';
 import DataTable from '../../components/DataTable';
@@ -8,10 +9,11 @@ import ErrorMessage from '../../components/ErrorMessage';
 import EmptyState from '../../components/EmptyState';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import TransferStudentModal from '../../components/TransferStudentModal';
+import AddServiceModal from '../../components/AddServiceModal';
 import Pagination from '../../components/Pagination';
 import Badge from '../../components/Badge';
 import BulkIntakeTab from './BulkIntakeTab';
-import { getStudents, deleteStudent, transferStudentBatch } from '../../services/studentService';
+import { getStudents, deleteStudent, transferStudentBatch, addStudentService } from '../../services/studentService';
 import { getBatches } from '../../services/batchService';
 import {
   Plus,
@@ -25,7 +27,9 @@ import {
   Filter,
   RotateCcw,
   FileSpreadsheet,
-  Users
+  Users,
+  Download,
+  PlusCircle
 } from 'lucide-react';
 
 const StudentListPage = () => {
@@ -39,6 +43,7 @@ const StudentListPage = () => {
 
   // Filters State
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedBatch, setSelectedBatch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedFeeStatus, setSelectedFeeStatus] = useState('');
@@ -48,6 +53,9 @@ const StudentListPage = () => {
 
   // Transfer modal state
   const [transferTarget, setTransferTarget] = useState(null);
+
+  // Add Service modal state
+  const [addServiceTarget, setAddServiceTarget] = useState(null);
 
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -64,6 +72,7 @@ const StudentListPage = () => {
         sortOrder
       };
       if (search.trim()) params.search = search.trim();
+      if (selectedCategory) params.category = selectedCategory;
       if (selectedBatch) params.batch = selectedBatch;
       if (selectedStatus) params.status = selectedStatus;
       if (selectedFeeStatus) params.feeStatus = selectedFeeStatus;
@@ -92,11 +101,11 @@ const StudentListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [search, selectedBatch, selectedStatus, selectedFeeStatus, selectedCourse, sortBy, sortOrder, batches]);
+  }, [search, selectedCategory, selectedBatch, selectedStatus, selectedFeeStatus, selectedCourse, sortBy, sortOrder, batches]);
 
   useEffect(() => {
     fetchStudentsData(1);
-  }, [selectedBatch, selectedStatus, selectedFeeStatus, selectedCourse, sortBy, sortOrder]);
+  }, [selectedCategory, selectedBatch, selectedStatus, selectedFeeStatus, selectedCourse, sortBy, sortOrder]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -105,12 +114,80 @@ const StudentListPage = () => {
 
   const handleResetFilters = () => {
     setSearch('');
+    setSelectedCategory('');
     setSelectedBatch('');
     setSelectedStatus('');
     setSelectedFeeStatus('');
     setSelectedCourse('');
     setSortBy('createdAt');
     setSortOrder('desc');
+  };
+
+  const handleExportDirectory = async () => {
+    try {
+      const params = { limit: 'all', sortBy, sortOrder };
+      if (search.trim()) params.search = search.trim();
+      if (selectedCategory) params.category = selectedCategory;
+      if (selectedBatch) params.batch = selectedBatch;
+      if (selectedStatus) params.status = selectedStatus;
+      if (selectedFeeStatus) params.feeStatus = selectedFeeStatus;
+      if (selectedCourse) params.course = selectedCourse;
+
+      const res = await getStudents(params);
+      const list = Array.isArray(res) ? res : (res?.students || []);
+
+      if (list.length === 0) {
+        alert('No student records found to export.');
+        return;
+      }
+
+      const exportRows = list.map((s, idx) => {
+        const total = s.totalFee !== undefined ? s.totalFee : 9000;
+        const paid = s.paidAmount || 0;
+        const adv = s.advanceAmount || 0;
+        const bal = s.balance !== undefined ? s.balance : (total - paid - adv);
+        const addrStr = s.address
+          ? [s.address.houseName, s.address.place, s.address.postOffice, s.address.district].filter(Boolean).join(', ')
+          : '';
+
+        return {
+          'Sl': idx + 1,
+          'Category': s.category || 'A – New Application',
+          'Student ID': s.studentId || '',
+          'Name': s.fullName || '',
+          'Mobile': s.primaryMobile || '',
+          'Status': s.currentStatus || 'Active',
+          'Next Action': s.nextAction || '',
+          'Next Action Date': s.followUpDate ? new Date(s.followUpDate).toISOString().split('T')[0] : '',
+          'Total Fee': total,
+          'Paid': paid,
+          'Advance Amount': adv,
+          'Balance': bal,
+          'Service': s.licenceServiceType || s.coursePackage || 'New Driving Licence',
+          'Vehicle / COV': s.vehicleType || 'LMV+MCWG',
+          'Batch': s.batch ? (typeof s.batch === 'object' ? s.batch.name : s.batch) : (s.batchName || ''),
+          'Sarathi App No': s.sarathiAppNo || s.applicationNo || '',
+          'LL Test Date': s.llTestDate ? new Date(s.llTestDate).toISOString().split('T')[0] : '',
+          'Final Test Date': s.finalTestDate ? new Date(s.finalTestDate).toISOString().split('T')[0] : '',
+          'Gender': s.gender || 'Male',
+          'DOB': s.dob ? new Date(s.dob).toISOString().split('T')[0] : '',
+          'Blood': s.bloodGroup || '',
+          'Guardian': s.guardian || '',
+          'Alt Mobile': s.alternateMobile || '',
+          'Address': addrStr,
+          'Pincode': s.address?.pincode || '',
+          'Verification': s.verificationNotes || '',
+          'Notes': s.notes || ''
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'BENZ_Student_Directory');
+      XLSX.writeFile(workbook, `BENZ_Student_Register_Directory_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (e) {
+      alert('Failed to export student directory: ' + e.message);
+    }
   };
 
   const handlePageChange = (newPage) => {
@@ -136,45 +213,111 @@ const StudentListPage = () => {
     fetchStudentsData(pagination.page);
   };
 
+  const handleAddServiceSuccess = async ({ studentId, service, fee, notes }) => {
+    await addStudentService(studentId, { service, fee, notes });
+    fetchStudentsData(pagination.page);
+  };
+
   const columns = [
     {
-      header: 'Student ID',
-      cell: (row) => (
-        <span className="font-mono text-xs font-black text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/40 px-2 py-0.5 rounded">
-          {row.studentId}
-        </span>
-      )
-    },
-    {
-      header: 'Student Name & Source',
+      header: 'Category & Student ID',
       cell: (row) => (
         <div>
-          <button
-            onClick={() => navigate(`/students/${row._id}`)}
-            className="font-bold text-slate-900 dark:text-slate-100 hover:text-red-600 dark:hover:text-red-400 text-left transition"
-          >
-            {row.fullName}
-          </button>
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-            {row.gender && <span>{row.gender}</span>}
-            {row.aliasSourceName && <span>&bull; {row.aliasSourceName}</span>}
-          </div>
+          <span className="font-mono text-xs font-black text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/40 px-2 py-0.5 rounded block w-fit">
+            {row.studentId}
+          </span>
+          <span className="text-[10px] text-slate-500 font-semibold block mt-1 truncate max-w-[120px]" title={row.category || 'N/A'}>
+            {row.category || 'A – New Application'}
+          </span>
         </div>
       )
     },
     {
-      header: 'Mobile',
-      cell: (row) => (
-        <div>
-          <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-mono text-xs font-semibold">
-            <Phone size={12} className="text-slate-400" />
-            <span>{row.primaryMobile}</span>
+      header: 'Name, Gender & Guardian',
+      cell: (row) => {
+        const dobStr = row.dob ? new Date(row.dob).toLocaleDateString('en-IN') : '';
+        return (
+          <div className="max-w-[160px]">
+            <button
+              onClick={() => navigate(`/students/${row._id}`)}
+              className="font-bold text-slate-900 dark:text-slate-100 hover:text-red-600 dark:hover:text-red-400 text-left transition block"
+            >
+              {row.fullName}
+            </button>
+            <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400 mt-0.5 font-medium">
+              {row.gender && <span>{row.gender}</span>}
+              {row.bloodGroup && <span className="text-red-500 font-bold">&bull; {row.bloodGroup}</span>}
+              {dobStr && <span className="text-slate-600 dark:text-slate-300 font-bold font-mono">&bull; DOB: {dobStr}</span>}
+              {row.guardian && <span className="text-slate-500 block w-full truncate" title={`Guardian: ${row.guardian}`}>Guardian: {row.guardian}</span>}
+            </div>
           </div>
-          {row.alternateMobile && (
-            <span className="text-[10px] text-slate-400 font-mono block">Alt: {row.alternateMobile}</span>
-          )}
-        </div>
-      )
+        );
+      }
+    },
+    {
+      header: 'Contact & Address',
+      cell: (row) => {
+        let addrStr = '';
+        if (row.address) {
+          if (typeof row.address === 'string') {
+            addrStr = row.address;
+          } else if (typeof row.address === 'object') {
+            addrStr = [row.address.houseName, row.address.place, row.address.postOffice, row.address.district].filter(Boolean).join(', ');
+          }
+        }
+        const pin = row.address?.pincode || row.pincode || '';
+
+        return (
+          <div className="max-w-[170px]">
+            <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-mono text-xs font-semibold">
+              <Phone size={11} className="text-slate-400 shrink-0" />
+              <span>{row.primaryMobile}</span>
+            </div>
+            {row.alternateMobile && (
+              <span className="text-[10px] text-slate-400 font-mono block">Alt: {row.alternateMobile}</span>
+            )}
+            {addrStr && (
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate mt-0.5 font-medium" title={addrStr}>
+                Addr: {addrStr}
+              </span>
+            )}
+            {pin && (
+              <span className="text-[10px] text-slate-400 font-mono block">Pin: {pin}</span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      header: 'Service & Vehicle (COV)',
+      cell: (row) => {
+        const serviceList = Array.isArray(row.services) && row.services.length > 0
+          ? row.services
+          : (row.licenceServiceType || row.service ? String(row.licenceServiceType || row.service).split(',').map(s => s.trim()).filter(Boolean) : []);
+
+        return (
+          <div className="max-w-[160px]">
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+              {row.vehicleType || row.vehicleCov || 'LMV+MCWG'}
+            </span>
+            {serviceList.length > 0 ? (
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {serviceList.map((srv, idx) => (
+                  <span
+                    key={idx}
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900 block"
+                    title={srv}
+                  >
+                    {srv}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[10px] text-slate-400 block">—</span>
+            )}
+          </div>
+        );
+      }
     },
     {
       header: 'Batch',
@@ -189,6 +332,10 @@ const StudentListPage = () => {
                 {row.batch.startTime ? `${row.batch.startTime} - ${row.batch.endTime}` : (row.batch.session || '')}
               </p>
             </div>
+          ) : row.batchName ? (
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              {row.batchName}
+            </span>
           ) : (
             <span className="text-xs text-amber-600 dark:text-amber-400 italic font-medium bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded border border-amber-200/50">
               Unassigned
@@ -198,46 +345,121 @@ const StudentListPage = () => {
       )
     },
     {
-      header: 'Course / Vehicle',
+      header: 'Sarathi App No',
       cell: (row) => (
-        <div>
-          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-            {row.coursePackage || `${row.vehicleType} (${row.licenceCategory || 'LMV'})`}
-          </span>
-          <span className="text-[10px] text-slate-400 block">{row.licenceServiceType || 'Fresh Licence'}</span>
-        </div>
+        <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+          {row.sarathiAppNo || row.applicationNo || '—'}
+        </span>
       )
     },
     {
-      header: 'Fee Status',
+      header: 'LL Test Date',
+      cell: (row) => (
+        <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
+          {row.llTestDate ? new Date(row.llTestDate).toLocaleDateString('en-IN') : '—'}
+        </span>
+      )
+    },
+    {
+      header: 'Final Test Date',
+      cell: (row) => (
+        <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
+          {row.finalTestDate ? new Date(row.finalTestDate).toLocaleDateString('en-IN') : '—'}
+        </span>
+      )
+    },
+    {
+      header: 'Total Fee',
       cell: (row) => {
-        const feeStatus = row.feeStatus || (row.balance <= 0 ? 'Paid' : (row.paidAmount > 0 ? 'Partially Paid' : 'Pending'));
+        const total = row.totalFee !== undefined ? Number(row.totalFee) : 9000;
         return (
-          <div>
-            <Badge type="fee" value={feeStatus} />
-            <p className="text-[10px] font-mono text-slate-500 mt-0.5">
-              Bal: ₹{row.balance !== undefined ? row.balance : ((row.totalFee || 9000) - (row.paidAmount || 0) - (row.advanceAmount || 0))}
-            </p>
+          <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+            ₹{total.toLocaleString('en-IN')}
+          </span>
+        );
+      }
+    },
+    {
+      header: 'Paid Amount',
+      cell: (row) => {
+        const paid = Number(row.paidAmount) || 0;
+        const adv = Number(row.advanceAmount) || 0;
+        const totalPaid = paid + adv;
+        return (
+          <div className="font-mono text-xs">
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 block">
+              ₹{totalPaid.toLocaleString('en-IN')}
+            </span>
+            {adv > 0 && (
+              <span className="text-[9px] text-blue-500 block">(Adv: ₹{adv})</span>
+            )}
           </div>
         );
       }
     },
     {
-      header: 'Student Status',
-      cell: (row) => <Badge type="status" value={row.currentStatus || 'Active'} />
+      header: 'Balance',
+      cell: (row) => {
+        const total = row.totalFee !== undefined ? Number(row.totalFee) : 9000;
+        const paid = Number(row.paidAmount) || 0;
+        const adv = Number(row.advanceAmount) || 0;
+        const bal = row.balance !== undefined ? Number(row.balance) : (total - paid - adv);
+        const feeStatus = row.feeStatus || (bal <= 0 ? 'Paid' : ((paid + adv) > 0 ? 'Partially Paid' : 'Pending'));
+
+        return (
+          <div className="font-mono text-xs">
+            <span className={`font-black block text-sm ${bal > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              ₹{bal.toLocaleString('en-IN')}
+            </span>
+            <div className="mt-0.5">
+              <Badge type="fee" value={feeStatus} />
+            </div>
+          </div>
+        );
+      }
     },
     {
-      header: 'Next Action / Date',
+      header: 'Status',
       cell: (row) => (
-        <div className="text-xs max-w-[150px]">
-          <p className="truncate font-medium text-slate-700 dark:text-slate-300" title={row.nextAction || 'None'}>
-            {row.nextAction || '—'}
-          </p>
-          {(row.testDate || row.followUpDate) && (
-            <p className="text-[10px] text-slate-400 flex items-center gap-1 font-mono mt-0.5">
-              <Calendar size={10} />
-              {row.testDate ? `Test: ${new Date(row.testDate).toLocaleDateString()}` : `Follow: ${new Date(row.followUpDate).toLocaleDateString()}`}
-            </p>
+        <Badge type="status" value={row.currentStatus || 'Active'} />
+      )
+    },
+    {
+      header: 'Next Action',
+      cell: (row) => (
+        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 max-w-[150px] block truncate" title={row.nextAction || ''}>
+          {row.nextAction || '—'}
+        </span>
+      )
+    },
+    {
+      header: 'Next Action Date',
+      cell: (row) => (
+        <span className="font-mono text-xs text-slate-700 dark:text-slate-300 flex items-center gap-1">
+          {row.followUpDate ? (
+            <>
+              <Calendar size={12} className="text-slate-400" />
+              {new Date(row.followUpDate).toLocaleDateString('en-IN')}
+            </>
+          ) : (
+            '—'
+          )}
+        </span>
+      )
+    },
+    {
+      header: 'Verification & Notes',
+      cell: (row) => (
+        <div className="text-[10px] max-w-[130px]">
+          {row.verificationNotes && (
+            <span className="text-slate-700 dark:text-slate-300 block font-semibold truncate" title={row.verificationNotes}>
+              {row.verificationNotes}
+            </span>
+          )}
+          {row.notes && (
+            <span className="text-slate-400 block truncate" title={row.notes}>
+              {row.notes}
+            </span>
           )}
         </div>
       )
@@ -266,6 +488,16 @@ const StudentListPage = () => {
             className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded transition"
           >
             <Edit size={16} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setAddServiceTarget(row);
+            }}
+            title="Add Extra Service (+Fee)"
+            className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded transition"
+          >
+            <PlusCircle size={16} />
           </button>
           <button
             onClick={(e) => {
@@ -343,7 +575,7 @@ const StudentListPage = () => {
                       type="text"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search by Student ID, Name, Mobile, Application No..."
+                      placeholder="Search by Student ID, Name, Mobile, Sarathi App No, Category, Notes, Address..."
                       className="w-full pl-9 pr-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:outline-none focus:ring-2 focus:ring-red-500"
                     />
                   </div>
@@ -353,7 +585,7 @@ const StudentListPage = () => {
                   >
                     Search
                   </button>
-                  {(search || selectedBatch || selectedStatus || selectedFeeStatus || selectedCourse) && (
+                  {(search || selectedCategory || selectedBatch || selectedStatus || selectedFeeStatus || selectedCourse) && (
                     <button
                       type="button"
                       onClick={handleResetFilters}
@@ -367,6 +599,14 @@ const StudentListPage = () => {
 
                 {/* Primary Action Buttons */}
                 <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleExportDirectory}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-md transition flex items-center gap-1.5 shadow-sm"
+                    title="Export all 26 fields of student directory to Excel"
+                  >
+                    <Download size={16} />
+                    <span>Export Directory (26 Fields)</span>
+                  </button>
                   <button
                     onClick={() => setActiveTab('bulk')}
                     className="px-3.5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 font-bold text-xs rounded-md transition flex items-center gap-1.5 border border-slate-300 dark:border-slate-600 shadow-xs"
@@ -389,6 +629,20 @@ const StudentListPage = () => {
                 <span className="text-slate-400 font-semibold flex items-center gap-1">
                   <Filter size={13} /> Filters:
                 </span>
+
+                {/* Category Filter */}
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="">All Categories</option>
+                  <option value="A – New Application">A – New Application</option>
+                  <option value="B – LL Done, Test Pending">B – LL Done, Test Pending</option>
+                  <option value="Fee Collection Follow Up">Fee Collection Follow Up</option>
+                  <option value="Passed">Passed</option>
+                  <option value="C – Final Test Done">C – Final Test Done</option>
+                </select>
 
                 {/* Batch Filter */}
                 <select
@@ -495,6 +749,14 @@ const StudentListPage = () => {
           </>
         )}
       </div>
+
+      {/* Add Extra Service Modal */}
+      <AddServiceModal
+        isOpen={Boolean(addServiceTarget)}
+        onClose={() => setAddServiceTarget(null)}
+        student={addServiceTarget}
+        onServiceAdded={handleAddServiceSuccess}
+      />
 
       {/* Transfer Batch Modal */}
       <TransferStudentModal

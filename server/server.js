@@ -69,41 +69,72 @@ app.use('/api/reports', reportRoutes);
 // Centralized Error Handler
 app.use(errorHandler);
 
+const { execSync } = require('child_process');
+
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
-
-// Startup error handling: catch EADDRINUSE and report clearly
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`\n❌ Error: Port ${PORT} is already in use.`);
-    console.error(`Stop the existing BENZ CRM backend process or use another PORT.\n`);
-    process.exit(1);
-  } else {
-    console.error('\n❌ Server startup error:', err);
-    process.exit(1);
-  }
-});
-
-// Graceful shutdown handling for clean stop/restart
-const handleShutdown = (signal) => {
-  console.log(`\n${signal} received. Closing BENZ CRM server gracefully...`);
-  server.close(async () => {
-    console.log('HTTP server closed.');
-    try {
-      const mongoose = require('mongoose');
-      await mongoose.connection.close(false);
-      console.log('MongoDB connection closed.');
-    } catch (dbErr) {
-      console.error('Error closing MongoDB connection:', dbErr);
+function freePort(port) {
+  try {
+    if (process.platform === 'win32') {
+      const result = execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const pids = new Set();
+      for (const line of result.trim().split('\n')) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && /^\d+$/.test(pid) && pid !== '0' && pid !== String(process.pid)) {
+          pids.add(pid);
+        }
+      }
+      for (const pid of pids) {
+        try { execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' }); } catch (_) {}
+      }
+    } else {
+      execSync(`fuser -k ${port}/tcp 2>/dev/null || true`);
     }
-    process.exit(0);
+  } catch (_) {}
+}
+
+let isListening = false;
+let server = null;
+
+const startServer = () => {
+  if (isListening) return;
+  isListening = true;
+
+  server = app.listen(PORT, () => {
+    console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`⚠️ Port ${PORT} is in use. Auto-releasing port ${PORT}...`);
+      freePort(PORT);
+      isListening = false;
+      setTimeout(() => {
+        startServer();
+      }, 1000);
+    } else {
+      console.error('🚨 HTTP Server Error:', err.message);
+    }
   });
 };
 
-process.on('SIGINT', () => handleShutdown('SIGINT'));
-process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+const handleGracefulShutdown = (signal) => {
+  if (server) {
+    server.close(() => {
+      if (signal === 'SIGUSR2') {
+        process.kill(process.pid, 'SIGUSR2');
+      } else {
+        process.exit(0);
+      }
+    });
+  } else {
+    process.exit(0);
+  }
+};
 
-module.exports = app;
+process.once('SIGUSR2', () => handleGracefulShutdown('SIGUSR2'));
+process.on('SIGINT', () => handleGracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => handleGracefulShutdown('SIGTERM'));
+
+startServer();

@@ -72,7 +72,7 @@ const studentSchema = new mongoose.Schema(
     },
     vehicleType: {
       type: String,
-      enum: ['2 Wheeler', '4 Wheeler', 'Both', '3 Wheeler', 'Heavy'],
+      trim: true,
       default: '4 Wheeler'
     },
     licenceCategory: {
@@ -108,10 +108,38 @@ const studentSchema = new mongoose.Schema(
     ],
 
     // Licence & RTO Pipeline
+    category: {
+      type: String,
+      trim: true
+    },
+    sarathiAppNo: {
+      type: String,
+      trim: true
+    },
+    verificationNotes: {
+      type: String,
+      trim: true
+    },
+    guardian: {
+      type: String,
+      trim: true
+    },
+    llTestDate: {
+      type: Date
+    },
+    finalTestDate: {
+      type: Date
+    },
+    services: [
+      {
+        type: String,
+        trim: true
+      }
+    ],
     licenceServiceType: {
       type: String,
       trim: true,
-      default: 'Fresh Licence'
+      default: ''
     },
     applicationNo: {
       type: String,
