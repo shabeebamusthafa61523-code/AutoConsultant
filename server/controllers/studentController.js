@@ -449,11 +449,21 @@ const createStudent = async (req, res, next) => {
 
     const sarathiAppNo = req.body.sarathiAppNo || req.body.applicationNo || '';
 
+    let servicesList = Array.isArray(req.body.services) ? req.body.services.filter(Boolean) : [];
+    let licenceServiceType = req.body.licenceServiceType || '';
+    if (servicesList.length > 0) {
+      licenceServiceType = servicesList.join(', ');
+    } else if (licenceServiceType) {
+      servicesList = licenceServiceType.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
     const studentData = {
       ...req.body,
       studentId,
       fullName: req.body.fullName.trim(),
       category: req.body.category || 'A – New Application',
+      services: servicesList,
+      licenceServiceType,
       guardian: req.body.guardian ? req.body.guardian.trim() : '',
       aliasSourceName: req.body.aliasSourceName ? req.body.aliasSourceName.trim() : '',
       primaryMobile: cleanPrimaryMobile,
@@ -545,6 +555,22 @@ const updateStudent = async (req, res, next) => {
     if (req.body.followUpDate === '') req.body.followUpDate = null;
     if (req.body.testDate === '') req.body.testDate = null;
     if (req.body.application !== undefined) req.body.application = req.body.application.trim();
+
+    // Multi-service processing
+    if (req.body.services !== undefined || req.body.licenceServiceType !== undefined) {
+      let servicesList = Array.isArray(req.body.services) ? req.body.services.filter(Boolean) : [];
+      let licenceServiceType = req.body.licenceServiceType || '';
+      if (servicesList.length > 0) {
+        req.body.licenceServiceType = servicesList.join(', ');
+        req.body.services = servicesList;
+      } else if (licenceServiceType) {
+        req.body.services = licenceServiceType.split(',').map(s => s.trim()).filter(Boolean);
+        req.body.licenceServiceType = licenceServiceType;
+      } else {
+        req.body.services = [];
+        req.body.licenceServiceType = '';
+      }
+    }
 
     // Validate balance with updated fees
     const targetTotalFee = req.body.totalFee !== undefined ? Number(req.body.totalFee) : student.totalFee;
@@ -874,8 +900,19 @@ const bulkImportStudents = async (req, res, next) => {
       const category = item.category || item['Category'] || '';
       const gender = ['Male', 'Female', 'Other'].includes(item.gender || item['Gender']) ? (item.gender || item['Gender']) : 'Male';
       const vehicleType = item.vehicleType || item['Vehicle / COV'] || item['Vehicle/COV'] || item['Vehicle Type'] || '4 Wheeler';
-      const licenceServiceType = item.licenceServiceType || item.service || item['Service'] || item['Service Type'] || 'New Driving Licence';
-      const coursePackage = item.coursePackage || item['Course Package'] || item['Course'] || `${licenceServiceType} (${vehicleType})`;
+      
+      const rawServices = item.services || item.licenceServiceType || item.service || item['Service'] || item['Service Type'] || '';
+      let servicesList = [];
+      let licenceServiceType = '';
+      if (Array.isArray(rawServices)) {
+        servicesList = rawServices.filter(Boolean);
+        licenceServiceType = servicesList.join(', ');
+      } else if (rawServices) {
+        licenceServiceType = String(rawServices).trim();
+        servicesList = licenceServiceType.split(',').map(s => s.trim()).filter(Boolean);
+      }
+
+      const coursePackage = item.coursePackage || item['Course Package'] || item['Course'] || (licenceServiceType ? `${licenceServiceType} (${vehicleType})` : vehicleType);
       const sarathiAppNo = item.sarathiAppNo || item['Sarathi App No'] || item['Sarathi App No.'] || item['Application No'] || item['applicationNo'] || '';
       const currentStatus = item.currentStatus || item['Status'] || 'Active';
       const nextAction = item.nextAction || item['Next Action'] || '';
@@ -982,6 +1019,7 @@ const bulkImportStudents = async (req, res, next) => {
         aliasSourceName,
         coursePackage,
         vehicleType,
+        services: servicesList,
         licenceServiceType,
         licenceCategory: item.licenceCategory || 'LMV',
         sarathiAppNo,
@@ -1057,6 +1095,65 @@ const bulkImportStudents = async (req, res, next) => {
   }
 };
 
+// @desc    Add extra service to student and update totalFee (current + added fee)
+// @route   POST /api/students/:id/add-service
+const addStudentService = async (req, res, next) => {
+  try {
+    const { service, fee = 0, notes } = req.body;
+    const student = await Student.findById(req.params.id);
+
+    if (!student) {
+      res.status(404);
+      throw new Error('Student not found');
+    }
+
+    if (!service || !service.trim()) {
+      res.status(400);
+      throw new Error('Service name is required.');
+    }
+
+    const cleanService = service.trim();
+    const addedFee = Number(fee) || 0;
+
+    // Existing services list
+    let existingServices = Array.isArray(student.services) && student.services.length > 0
+      ? student.services
+      : (student.licenceServiceType ? student.licenceServiceType.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+    if (!existingServices.includes(cleanService)) {
+      existingServices.push(cleanService);
+    }
+
+    const oldTotalFee = student.totalFee || 0;
+    const newTotalFee = oldTotalFee + addedFee;
+
+    student.services = existingServices;
+    student.licenceServiceType = existingServices.join(', ');
+    student.totalFee = newTotalFee;
+
+    student.timeline.push({
+      action: 'Service Added',
+      category: 'General',
+      description: `Added extra service: [${cleanService}] (+₹${addedFee.toLocaleString('en-IN')}). Total Fee updated from ₹${oldTotalFee.toLocaleString('en-IN')} to ₹${newTotalFee.toLocaleString('en-IN')}${notes ? ` (${notes})` : ''}`,
+      timestamp: new Date(),
+      performedBy: req.user ? req.user.name : 'System'
+    });
+
+    await student.save();
+
+    const populated = await Student.findById(student._id).populate('batch');
+    res.json({
+      message: `Added service "${cleanService}" successfully!`,
+      student: populated,
+      addedFee,
+      oldTotalFee,
+      newTotalFee
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getStudents,
   getStudentById,
@@ -1065,6 +1162,7 @@ module.exports = {
   updateStudent,
   updateStudentStatus,
   transferStudentBatch,
+  addStudentService,
   addStudentDocument,
   updateDocumentStatus,
   deleteStudent,

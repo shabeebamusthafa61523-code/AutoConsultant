@@ -8,6 +8,7 @@ const {
   updateStudent,
   updateStudentStatus,
   transferStudentBatch,
+  addStudentService,
   addStudentDocument,
   updateDocumentStatus,
   deleteStudent,
@@ -23,9 +24,10 @@ router.post('/bulk-import', protect, bulkImportStudents);
 
 router.get('/:id/details', protect, getStudentDetails);
 
-// Status & Batch Transfer
+// Status, Batch Transfer & Add Service
 router.patch('/:id/status', protect, updateStudentStatus);
 router.post('/:id/batch-transfer', protect, transferStudentBatch);
+router.post('/:id/add-service', protect, addStudentService);
 
 // Document Management
 router.post('/:id/documents', protect, addStudentDocument);

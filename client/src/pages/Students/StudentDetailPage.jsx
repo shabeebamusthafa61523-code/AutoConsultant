@@ -9,12 +9,14 @@ import Modal from '../../components/Modal';
 import Badge from '../../components/Badge';
 import TransferStudentModal from '../../components/TransferStudentModal';
 import ReceiptModal from '../../components/ReceiptModal';
+import AddServiceModal from '../../components/AddServiceModal';
 import {
   getStudentDetails,
   updateStudentStatus,
   transferStudentBatch,
   addStudentDocument,
-  updateDocumentStatus
+  updateDocumentStatus,
+  addStudentService
 } from '../../services/studentService';
 import { createClass } from '../../services/classService';
 import { createPayment } from '../../services/paymentService';
@@ -90,6 +92,9 @@ const StudentDetailPage = () => {
 
   // Transfer Batch Modal State
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+
+  // Add Service Modal State
+  const [addServiceModalOpen, setAddServiceModalOpen] = useState(false);
 
   // Add Document Modal State
   const [docModalOpen, setDocModalOpen] = useState(false);
@@ -176,6 +181,11 @@ const StudentDetailPage = () => {
 
   const handleTransferBatch = async ({ targetBatchId, reason }) => {
     await transferStudentBatch(id, { newBatchId: targetBatchId, reason });
+    fetchDetails();
+  };
+
+  const handleAddService = async ({ service, fee, notes }) => {
+    await addStudentService(id, { service, fee, notes });
     fetchDetails();
   };
 
@@ -273,6 +283,12 @@ const StudentDetailPage = () => {
               <Plus size={15} /> Record Payment
             </button>
             <button
+              onClick={() => setAddServiceModalOpen(true)}
+              className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 font-bold text-xs rounded-md transition flex items-center gap-1.5 border border-blue-200 dark:border-blue-800"
+            >
+              <Plus size={15} /> Add Service
+            </button>
+            <button
               onClick={() => setTransferModalOpen(true)}
               className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 font-bold text-xs rounded-md transition flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800"
             >
@@ -326,8 +342,15 @@ const StudentDetailPage = () => {
                   <span className="font-semibold text-slate-700 dark:text-slate-300">
                     Vehicle / COV: <strong className="text-red-600 dark:text-red-400">{student.vehicleType || 'LMV+MCWG'}</strong>
                   </span>
-                  {student.licenceServiceType && (
-                    <span>&bull; Service: <strong className="text-slate-800 dark:text-slate-200">{student.licenceServiceType}</strong></span>
+                  {(student.services?.length > 0 || student.licenceServiceType) && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="text-slate-400 font-semibold">&bull; Services:</span>
+                      {(student.services && student.services.length > 0 ? student.services : student.licenceServiceType.split(',').map(s => s.trim())).map((srv, idx) => (
+                        <span key={idx} className="px-2 py-0.5 rounded bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900 font-bold text-[10px]">
+                          {srv}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1488,6 +1511,14 @@ const StudentDetailPage = () => {
           </div>
         </form>
       </Modal>
+
+      {/* ADD EXTRA SERVICE MODAL */}
+      <AddServiceModal
+        isOpen={addServiceModalOpen}
+        onClose={() => setAddServiceModalOpen(false)}
+        student={student}
+        onServiceAdded={handleAddService}
+      />
 
       {/* TRANSFER STUDENT BATCH MODAL */}
       <TransferStudentModal

@@ -65,7 +65,8 @@ const StudentFormPage = () => {
 
     // Section 3: Course & Package
     coursePackage: 'LMV+MCWG (Fresh Licence)',
-    licenceServiceType: 'Fresh Licence',
+    services: [],
+    licenceServiceType: '',
     vehicleType: 'Both',
     licenceCategory: 'LMV',
     registrationDate: new Date().toISOString().split('T')[0],
@@ -120,6 +121,13 @@ const StudentFormPage = () => {
 
         if (isEdit) {
           const student = await getStudentById(id);
+          let initialServices = [];
+          if (Array.isArray(student.services) && student.services.length > 0) {
+            initialServices = student.services;
+          } else if (student.licenceServiceType) {
+            initialServices = student.licenceServiceType.split(',').map(s => s.trim()).filter(Boolean);
+          }
+
           setFormData({
             category: student.category || 'A – New Application',
             studentId: student.studentId || '',
@@ -146,7 +154,8 @@ const StudentFormPage = () => {
             },
 
             coursePackage: student.coursePackage || 'LMV+MCWG (Fresh Licence)',
-            licenceServiceType: student.licenceServiceType || 'Fresh Licence',
+            services: initialServices,
+            licenceServiceType: student.licenceServiceType || initialServices.join(', '),
             vehicleType: student.vehicleType || 'Both',
             licenceCategory: student.licenceCategory || 'LMV',
             registrationDate: student.registrationDate ? new Date(student.registrationDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -203,6 +212,53 @@ const StudentFormPage = () => {
   const isValidIndianMobile = (num) => {
     const cleaned = cleanPhone(num);
     return /^[6-9]\d{9}$/.test(cleaned);
+  };
+
+  const handleAddService = (serviceName) => {
+    if (!serviceName) return;
+    setFormData(prev => {
+      const current = prev.services || [];
+      if (current.includes(serviceName)) return prev;
+      const updated = [...current, serviceName];
+
+      // Sum fees of all selected services
+      let newTotalFee = 0;
+      updated.forEach(srv => {
+        const matched = availableServices.find(s => s.service === srv);
+        if (matched && matched.totalFee) {
+          newTotalFee += Number(matched.totalFee);
+        }
+      });
+
+      return {
+        ...prev,
+        services: updated,
+        licenceServiceType: updated.join(', '),
+        totalFee: newTotalFee > 0 ? newTotalFee : prev.totalFee
+      };
+    });
+  };
+
+  const handleRemoveService = (serviceName) => {
+    setFormData(prev => {
+      const current = prev.services || [];
+      const updated = current.filter(s => s !== serviceName);
+
+      let newTotalFee = 0;
+      updated.forEach(srv => {
+        const matched = availableServices.find(s => s.service === srv);
+        if (matched && matched.totalFee) {
+          newTotalFee += Number(matched.totalFee);
+        }
+      });
+
+      return {
+        ...prev,
+        services: updated,
+        licenceServiceType: updated.join(', '),
+        totalFee: updated.length === 0 ? 9000 : (newTotalFee > 0 ? newTotalFee : prev.totalFee)
+      };
+    });
   };
 
   const handleChange = (e) => {
@@ -637,30 +693,58 @@ const StudentFormPage = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Service Package (Official 2026 DB Services)
+            <div className="sm:col-span-2 space-y-2">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Assigned Services (Select one or more services)
               </label>
-              <select
-                name="licenceServiceType"
-                value={formData.licenceServiceType}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  handleChange(e);
-                  const matchedService = availableServices.find(s => s.service === val);
-                  if (matchedService && matchedService.totalFee) {
-                    setFormData(prev => ({ ...prev, totalFee: matchedService.totalFee }));
-                  }
-                }}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-semibold"
-              >
-                <option value="">-- Leave Blank / Select Official Service --</option>
-                {availableServices.map((s) => (
-                  <option key={s._id || s.feeId} value={s.service}>
-                    {s.service} (₹{s.totalFee ? s.totalFee.toLocaleString('en-IN') : '0'})
-                  </option>
-                ))}
-              </select>
+
+              {/* Selected Services Badges */}
+              <div className="flex flex-wrap items-center gap-1.5 min-h-[42px] p-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md">
+                {formData.services && formData.services.length > 0 ? (
+                  formData.services.map((srv, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800 text-xs font-bold rounded-md shadow-2xs"
+                    >
+                      <span>{srv}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveService(srv)}
+                        className="text-red-500 hover:text-red-700 dark:hover:text-red-200 font-bold ml-0.5 focus:outline-none"
+                        title={`Remove ${srv}`}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-slate-400 italic">No services assigned. Select from dropdown below to add services.</span>
+                )}
+              </div>
+
+              {/* Service Selection Dropdown */}
+              <div className="flex items-center gap-2">
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleAddService(e.target.value);
+                      e.target.value = '';
+                    }
+                  }}
+                  defaultValue=""
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-semibold focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="" disabled>+ Add Official Service Package (Official 2026 BENZ Structure)...</option>
+                  {availableServices.map((s) => {
+                    const isSelected = formData.services?.includes(s.service);
+                    return (
+                      <option key={s._id || s.feeId} value={s.service} disabled={isSelected}>
+                        {isSelected ? '✓ ' : '+ '}{s.service} (₹{s.totalFee ? s.totalFee.toLocaleString('en-IN') : '0'})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
             </div>
 
             <div>

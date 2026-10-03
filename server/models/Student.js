@@ -120,6 +120,12 @@ const studentSchema = new mongoose.Schema(
     finalTestDate: {
       type: Date
     },
+    services: [
+      {
+        type: String,
+        trim: true
+      }
+    ],
     licenceServiceType: {
       type: String,
       trim: true,

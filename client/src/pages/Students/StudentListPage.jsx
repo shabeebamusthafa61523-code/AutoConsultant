@@ -9,10 +9,11 @@ import ErrorMessage from '../../components/ErrorMessage';
 import EmptyState from '../../components/EmptyState';
 import ConfirmDeleteModal from '../../components/ConfirmDeleteModal';
 import TransferStudentModal from '../../components/TransferStudentModal';
+import AddServiceModal from '../../components/AddServiceModal';
 import Pagination from '../../components/Pagination';
 import Badge from '../../components/Badge';
 import BulkIntakeTab from './BulkIntakeTab';
-import { getStudents, deleteStudent, transferStudentBatch } from '../../services/studentService';
+import { getStudents, deleteStudent, transferStudentBatch, addStudentService } from '../../services/studentService';
 import { getBatches } from '../../services/batchService';
 import {
   Plus,
@@ -27,7 +28,8 @@ import {
   RotateCcw,
   FileSpreadsheet,
   Users,
-  Download
+  Download,
+  PlusCircle
 } from 'lucide-react';
 
 const StudentListPage = () => {
@@ -51,6 +53,9 @@ const StudentListPage = () => {
 
   // Transfer modal state
   const [transferTarget, setTransferTarget] = useState(null);
+
+  // Add Service modal state
+  const [addServiceTarget, setAddServiceTarget] = useState(null);
 
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -208,6 +213,11 @@ const StudentListPage = () => {
     fetchStudentsData(pagination.page);
   };
 
+  const handleAddServiceSuccess = async ({ studentId, service, fee, notes }) => {
+    await addStudentService(studentId, { service, fee, notes });
+    fetchStudentsData(pagination.page);
+  };
+
   const columns = [
     {
       header: 'Category & Student ID',
@@ -280,14 +290,34 @@ const StudentListPage = () => {
     },
     {
       header: 'Service & Vehicle (COV)',
-      cell: (row) => (
-        <div>
-          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-            {row.vehicleType || row.vehicleCov || 'LMV+MCWG'}
-          </span>
-          <span className="text-[10px] text-slate-400 block">{row.licenceServiceType || row.service || '—'}</span>
-        </div>
-      )
+      cell: (row) => {
+        const serviceList = Array.isArray(row.services) && row.services.length > 0
+          ? row.services
+          : (row.licenceServiceType || row.service ? String(row.licenceServiceType || row.service).split(',').map(s => s.trim()).filter(Boolean) : []);
+
+        return (
+          <div className="max-w-[160px]">
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+              {row.vehicleType || row.vehicleCov || 'LMV+MCWG'}
+            </span>
+            {serviceList.length > 0 ? (
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {serviceList.map((srv, idx) => (
+                  <span
+                    key={idx}
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900 block"
+                    title={srv}
+                  >
+                    {srv}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[10px] text-slate-400 block">—</span>
+            )}
+          </div>
+        );
+      }
     },
     {
       header: 'Batch',
@@ -458,6 +488,16 @@ const StudentListPage = () => {
             className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded transition"
           >
             <Edit size={16} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setAddServiceTarget(row);
+            }}
+            title="Add Extra Service (+Fee)"
+            className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded transition"
+          >
+            <PlusCircle size={16} />
           </button>
           <button
             onClick={(e) => {
@@ -709,6 +749,14 @@ const StudentListPage = () => {
           </>
         )}
       </div>
+
+      {/* Add Extra Service Modal */}
+      <AddServiceModal
+        isOpen={Boolean(addServiceTarget)}
+        onClose={() => setAddServiceTarget(null)}
+        student={addServiceTarget}
+        onServiceAdded={handleAddServiceSuccess}
+      />
 
       {/* Transfer Batch Modal */}
       <TransferStudentModal
