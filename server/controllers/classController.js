@@ -5,14 +5,15 @@ const Vehicle = require('../models/Vehicle');
 const Batch = require('../models/Batch');
 const Schedule = require('../models/Schedule');
 const Attendance = require('../models/Attendance');
+const Application = require('../models/Application');
 const AuditLog = require('../models/AuditLog');
 
 // Helper function to sync student training progress after any class creation, update, or deletion
-// Implements the AUTO CONSULTANT reference formula:
-// Road equivalent = Road KM / 5
-// H equivalent = H / 3
-// Total equivalent classes = (Road KM / 5) + (H / 3) + Bike Classes
-// Pending classes = Required Classes - Total Equivalent Classes
+// Implements the BENZ AutoConsultant OS R&D formula:
+// 5 KM road driving = 1 Road Class
+// 3 H practices = 1 H Class
+// Total Classes = Road Classes + H Classes + Bike Classes
+// Equivalent Progress = (Road KM / 5) + (H Practices / 3) + Bike Classes
 const syncStudentTrainingProgress = async (studentId) => {
   if (!studentId) return;
   try {
@@ -22,6 +23,7 @@ const syncStudentTrainingProgress = async (studentId) => {
     const classes = await Class.find({ student: studentId, status: { $ne: 'Cancelled' } });
 
     let totalKm = 0;
+    let totalHPractices = 0;
     let totalHours = 0;
     let roadClassesCount = 0;
     let hTrackClassesCount = 0;
@@ -29,17 +31,19 @@ const syncStudentTrainingProgress = async (studentId) => {
     let latestClassDate = null;
 
     classes.forEach((c) => {
-      const km = Number(c.km || 0);
-      const hours = Number(c.hours || 0);
+      const km = Number(c.kmDriven || c.km || 0);
+      const hCount = Number(c.hPracticeCount || (c.trainingType && c.trainingType.toLowerCase().includes('h') ? 1 : 0));
+      const hours = Number(c.duration ? c.duration / 60 : (c.hours || 1));
       const bikes = Number(c.bikeClassCount || 0);
 
       totalKm += km;
+      totalHPractices += hCount;
       totalHours += hours;
       bikeClassesCount += bikes;
 
       const t = (c.trainingType || '').toLowerCase();
-      if (t.includes('road')) roadClassesCount++;
-      if (t.includes('h') || t.includes('track') || t.includes('reverse') || t.includes('yard')) hTrackClassesCount++;
+      if (km > 0 || t.includes('road')) roadClassesCount++;
+      if (hCount > 0 || t.includes('h') || t.includes('track') || t.includes('reverse')) hTrackClassesCount++;
       if (t.includes('bike') || t.includes('2 wheeler') || t.includes('motorcycle')) {
         if (bikes === 0) bikeClassesCount += 1;
       }
@@ -49,16 +53,20 @@ const syncStudentTrainingProgress = async (studentId) => {
       }
     });
 
-    // Exact unrounded reference formula
-    const equivalentClasses = (totalKm / 5) + (totalHours / 3) + bikeClassesCount;
+    // Exact R&D calculations: 5 KM = 1 Road Class, 3 H practices = 1 H Class
+    const calcRoadClasses = Math.floor(totalKm / 5);
+    const calcHClasses = Math.floor(totalHPractices / 3);
+    const totalDerivedClasses = calcRoadClasses + calcHClasses + bikeClassesCount;
+
+    const equivalentClasses = (totalKm / 5) + (totalHPractices / 3) + bikeClassesCount;
     const requiredClasses = student.trainingProgress?.requiredClasses || 20;
-    const pendingClasses = Math.max(0, requiredClasses - equivalentClasses);
+    const pendingClasses = Math.max(0, requiredClasses - totalDerivedClasses);
     const completionPercentage = Math.min(100, Math.round((equivalentClasses / requiredClasses) * 100));
 
     let progressStatus = 'Not Started';
-    if (completionPercentage >= 100) {
+    if (completionPercentage >= 100 || totalDerivedClasses >= requiredClasses) {
       progressStatus = 'Completed';
-    } else if (completionPercentage >= 80) {
+    } else if (completionPercentage >= 80 || totalDerivedClasses >= 16) {
       progressStatus = 'Test Ready';
     } else if (classes.length > 0) {
       progressStatus = 'In Progress';
@@ -67,12 +75,12 @@ const syncStudentTrainingProgress = async (studentId) => {
     student.trainingProgress = {
       ...(student.trainingProgress || {}),
       status: progressStatus,
-      roadClassesCount,
-      hTrackClassesCount,
+      roadClassesCount: calcRoadClasses || roadClassesCount,
+      hTrackClassesCount: calcHClasses || hTrackClassesCount,
       bikeClassesCount,
       totalKm,
-      totalHours,
-      equivalentClasses,
+      totalHours: Math.round(totalHours * 10) / 10,
+      equivalentClasses: Math.round(equivalentClasses * 10) / 10,
       requiredClasses,
       pendingClasses,
       completionPercentage,
@@ -80,6 +88,23 @@ const syncStudentTrainingProgress = async (studentId) => {
     };
 
     await student.save();
+
+    // Sync to Application trainingSummary as required by R&D architecture
+    await Application.updateMany(
+      { student: studentId },
+      {
+        $set: {
+          'trainingSummary.roadKm': totalKm,
+          'trainingSummary.roadClasses': calcRoadClasses,
+          'trainingSummary.hPractices': totalHPractices,
+          'trainingSummary.hClasses': calcHClasses,
+          'trainingSummary.bikeClasses': bikeClassesCount,
+          'trainingSummary.totalClasses': totalDerivedClasses,
+          'trainingSummary.requiredClasses': requiredClasses,
+          'trainingSummary.completionPercentage': completionPercentage
+        }
+      }
+    );
   } catch (error) {
     console.error('Failed to sync student training progress:', error.message);
   }

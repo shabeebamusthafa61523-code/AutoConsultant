@@ -8,18 +8,18 @@ const {
   updateUser,
   deleteUser
 } = require('../controllers/userController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.post('/login', loginUser);
 
 router.route('/')
   .get(protect, getUsers)
-  .post(protect, createUser);
+  .post(protect, authorize('Superadmin', 'Admin'), createUser);
 
 router.get('/profile', protect, getUserProfile);
 
 router.route('/:id')
-  .put(protect, updateUser)
-  .delete(protect, deleteUser);
+  .put(protect, authorize('Superadmin', 'Admin'), updateUser)
+  .delete(protect, authorize('Superadmin', 'Admin'), deleteUser);
 
 module.exports = router;

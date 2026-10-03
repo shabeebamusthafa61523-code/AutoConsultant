@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
 const Payment = require('../models/Payment');
 const Student = require('../models/Student');
+const Application = require('../models/Application');
 const Counter = require('../models/Counter');
 const AuditLog = require('../models/AuditLog');
 
-// Helper to auto-generate atomic receipt numbers (REC-0001, REC-0002, ...)
+// Helper to auto-generate atomic receipt numbers (BENZ-REC-0001, BENZ-REC-0002, ...)
 const generateReceiptNo = async () => {
   const counter = await Counter.findByIdAndUpdate(
     { _id: 'receiptNo' },
@@ -12,29 +13,28 @@ const generateReceiptNo = async () => {
     { new: true, upsert: true }
   );
   const formattedSeq = String(counter.seq).padStart(4, '0');
-  return `REC-${formattedSeq}`;
+  return `BENZ-REC-${formattedSeq}`;
 };
 
-// Helper function to recalculate student paid/advance amounts dynamically from payment records
-// Strictly follows the business logic:
-// Fee Payment updates totalPaid, Advance Payment updates totalAdvance.
-// Non-Fee Payment types (e.g. Exam Fee, Registration Fee) issue standalone receipts without altering tuition course fee balance.
-const updateStudentPaymentTotals = async (studentId) => {
+// Helper function to recalculate student and application payment totals dynamically from payment records
+const updateStudentPaymentTotals = async (studentId, applicationId = null) => {
   if (!studentId) return;
   const studentPayments = await Payment.find({
     student: studentId,
     status: { $ne: 'Cancelled' }
   });
 
+  let totalReceived = 0;
   let totalPaid = 0;
   let totalAdvance = 0;
 
   studentPayments.forEach((p) => {
     const amt = Number(p.amount) || 0;
-    if (p.paymentType === 'Fee Payment') {
-      totalPaid += amt;
-    } else if (p.paymentType === 'Advance Payment') {
+    totalReceived += amt;
+    if (p.paymentType === 'Advance Payment') {
       totalAdvance += amt;
+    } else {
+      totalPaid += amt;
     }
   });
 
@@ -42,6 +42,21 @@ const updateStudentPaymentTotals = async (studentId) => {
     paidAmount: totalPaid,
     advanceAmount: totalAdvance
   });
+
+  // Also update Application ledger breakdown
+  let app = null;
+  if (applicationId && mongoose.Types.ObjectId.isValid(applicationId)) {
+    app = await Application.findById(applicationId);
+  } else {
+    app = await Application.findOne({ student: studentId }).sort({ createdAt: -1 });
+  }
+
+  if (app && app.feeStructure) {
+    const net = Number(app.feeStructure.netPayable) || 9000;
+    app.feeStructure.totalReceived = totalReceived;
+    app.feeStructure.balanceDue = Math.max(0, net - totalReceived);
+    await app.save();
+  }
 };
 
 // @desc    Get dynamic payment summary statistics
@@ -359,9 +374,43 @@ const createPayment = async (req, res, next) => {
       balanceAfter = Math.max(0, previousBalance - parsedAmount);
     }
 
+    // Find linked application if provided or active for student
+    let appDoc = null;
+    if (req.body.application && mongoose.Types.ObjectId.isValid(req.body.application)) {
+      appDoc = await Application.findById(req.body.application);
+    } else if (req.body.applicationId) {
+      appDoc = await Application.findOne({ applicationId: req.body.applicationId });
+    } else {
+      appDoc = await Application.findOne({ student }).sort({ createdAt: -1 });
+    }
+
+    const feeBreakdown = appDoc?.feeStructure ? {
+      packageFee: appDoc.feeStructure.packageFee,
+      rtoServiceFee: appDoc.feeStructure.rtoServiceFee,
+      retestFee: appDoc.feeStructure.retestFee,
+      otherCharges: appDoc.feeStructure.otherCharges,
+      discount: appDoc.feeStructure.discount,
+      netPayable: appDoc.feeStructure.netPayable,
+      totalReceived: (appDoc.feeStructure.totalReceived || 0) + parsedAmount,
+      balanceDue: Math.max(0, (appDoc.feeStructure.netPayable || 0) - ((appDoc.feeStructure.totalReceived || 0) + parsedAmount))
+    } : {
+      packageFee: studentRecord.totalFee || 9000,
+      rtoServiceFee: 0,
+      retestFee: 0,
+      otherCharges: 0,
+      discount: 0,
+      netPayable: studentRecord.totalFee || 9000,
+      totalReceived: (studentRecord.paidAmount || 0) + parsedAmount,
+      balanceDue: balanceAfter
+    };
+
     const payment = await Payment.create({
       receiptNo,
       student,
+      application: appDoc?._id || null,
+      applicationId: appDoc?.applicationId || '',
+      receivedBy: req.body.receivedBy || (req.user ? req.user.name : 'Office Staff'),
+      feeBreakdown,
       paymentDate: validPaymentDate,
       amount: parsedAmount,
       paymentType: (paymentType && paymentType.trim()) || 'Fee Payment',
@@ -375,7 +424,7 @@ const createPayment = async (req, res, next) => {
     });
 
     // Recalculate student paid/advance totals atomically
-    await updateStudentPaymentTotals(student);
+    await updateStudentPaymentTotals(student, appDoc?._id);
 
     // Append to Student activity timeline atomically without full-document validation risk
     await Student.findByIdAndUpdate(student, {
