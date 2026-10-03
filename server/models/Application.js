@@ -228,6 +228,95 @@ const applicationSchema = new mongoose.Schema(
   }
 );
 
+// Pre-validate hook to sanitize serviceType and lifecycleStatus enum inputs
+applicationSchema.pre('validate', function (next) {
+  const VALID_SERVICE_TYPES = [
+    'Fresh Licence',
+    'Additional Class',
+    'Endorsement',
+    'Renewal',
+    'Badge',
+    'Duplicate Licence',
+    'Retest',
+    'Other'
+  ];
+
+  const VALID_LIFECYCLE_STATUSES = [
+    'Lead',
+    'Registered',
+    'Documents Pending',
+    'LL Processing',
+    'LL Approved',
+    'Training',
+    'Test Scheduled',
+    'Retest',
+    'Test Passed',
+    'Licence Processing',
+    'Completed',
+    'On Hold',
+    'Cancelled'
+  ];
+
+  if (this.serviceType && !VALID_SERVICE_TYPES.includes(this.serviceType)) {
+    if (!this.coursePackage || this.coursePackage === 'LMV+MCWG (Fresh Licence)') {
+      this.coursePackage = this.serviceType;
+    }
+    const lower = String(this.serviceType).toLowerCase();
+    if (lower.includes('fresh') || lower.includes('new') || lower.includes('licence') || lower.includes('training') || lower.includes('package') || lower.includes('full')) {
+      this.serviceType = 'Fresh Licence';
+    } else if (lower.includes('additional') || lower.includes('class')) {
+      this.serviceType = 'Additional Class';
+    } else if (lower.includes('endorse')) {
+      this.serviceType = 'Endorsement';
+    } else if (lower.includes('renew')) {
+      this.serviceType = 'Renewal';
+    } else if (lower.includes('badge')) {
+      this.serviceType = 'Badge';
+    } else if (lower.includes('duplicate')) {
+      this.serviceType = 'Duplicate Licence';
+    } else if (lower.includes('retest') || lower.includes('re-test')) {
+      this.serviceType = 'Retest';
+    } else {
+      this.serviceType = 'Other';
+    }
+  }
+
+  if (this.lifecycleStatus && !VALID_LIFECYCLE_STATUSES.includes(this.lifecycleStatus)) {
+    const lower = String(this.lifecycleStatus).toLowerCase();
+    if (lower === 'registration' || lower.includes('register') || lower === 'active' || lower === 'new') {
+      this.lifecycleStatus = 'Registered';
+    } else if (lower.includes('lead')) {
+      this.lifecycleStatus = 'Lead';
+    } else if (lower.includes('doc')) {
+      this.lifecycleStatus = 'Documents Pending';
+    } else if (lower.includes('ll processing') || lower.includes('processing')) {
+      this.lifecycleStatus = 'LL Processing';
+    } else if (lower.includes('approved')) {
+      this.lifecycleStatus = 'LL Approved';
+    } else if (lower.includes('train')) {
+      this.lifecycleStatus = 'Training';
+    } else if (lower.includes('scheduled')) {
+      this.lifecycleStatus = 'Test Scheduled';
+    } else if (lower.includes('retest')) {
+      this.lifecycleStatus = 'Retest';
+    } else if (lower.includes('passed')) {
+      this.lifecycleStatus = 'Test Passed';
+    } else if (lower.includes('licence')) {
+      this.lifecycleStatus = 'Licence Processing';
+    } else if (lower.includes('complet')) {
+      this.lifecycleStatus = 'Completed';
+    } else if (lower.includes('hold')) {
+      this.lifecycleStatus = 'On Hold';
+    } else if (lower.includes('cancel')) {
+      this.lifecycleStatus = 'Cancelled';
+    } else {
+      this.lifecycleStatus = 'Registered';
+    }
+  }
+
+  next();
+});
+
 // Virtual for dynamic Net Payable & Balance Due
 applicationSchema.pre('save', function (next) {
   if (this.feeStructure) {

@@ -17,7 +17,7 @@ import {
   transferStudentBatch,
   addStudentDocument,
   updateDocumentStatus,
-  addStudentService
+  addStudentService,
   getStudentClassSlip
 } from '../../services/studentService';
 import { createClass } from '../../services/classService';
@@ -579,6 +579,8 @@ const StudentDetailPage = () => {
                   {student.bloodGroup && (
                     <span className="text-[10px] font-mono font-black text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded border border-red-200 dark:border-red-900">
                       Blood: {student.bloodGroup}
+                    </span>
+                  )}
                   {activeApp && (
                     <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 px-2 py-0.5 rounded">
                       {activeApp.applicationId}
@@ -655,6 +657,7 @@ const StudentDetailPage = () => {
               </div>
             </div>
           </div>
+        </div>
 
           {/* Top 5 KPI Metrics Card Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2 border-t border-slate-100 dark:border-slate-700">
@@ -730,6 +733,7 @@ const StudentDetailPage = () => {
                     ₹ {feeSummary.balance ? feeSummary.balance.toLocaleString('en-IN') : '0'}
                   </span>
                 </div>
+              </div>
             {/* 5. Mandatory Next Action */}
             <div className={`p-3 rounded-lg border flex flex-col justify-between ${
               isOverdue
@@ -1026,26 +1030,9 @@ const StudentDetailPage = () => {
                 <div className="sm:col-span-2">
                   <span className="text-slate-400 block font-medium">Verification Status / Details</span>
                   <span className="font-semibold text-emerald-700 dark:text-emerald-400">{student.verificationNotes || 'Source Verified'}</span>
-        {activeTab === 'applications' && (
-          <div className="space-y-5">
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 dark:border-slate-700 pb-4">
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    <Layers size={17} className="text-red-600" />
-                    Student Licence Applications Pipeline ({applications.length})
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    1-to-Many architecture: Permanent Student ID remains attached to person, while each service receives its own Application ID.
-                  </p>
                 </div>
-                <button
-                  onClick={() => setNewAppModalOpen(true)}
-                  className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-md transition flex items-center gap-1.5 shadow-sm"
-                >
-                  <Plus size={15} /> + New Service Application
-                </button>
               </div>
+            </div>
 
             <div>
               <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-2 mb-4">
@@ -1085,6 +1072,47 @@ const StudentDetailPage = () => {
                 <div>
                   <span className="text-slate-400 block font-medium">Referral / Source (Alias)</span>
                   <span className="font-semibold text-slate-700 dark:text-slate-300">{student.aliasSourceName || 'Direct Walk-in'}</span>
+                </div>
+              </div>
+            </div>
+
+            {student.notes && (
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-2 mb-3">
+                  Notes & Remarks
+                </h3>
+                <p className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-md border border-slate-200 dark:border-slate-700">
+                  {student.notes}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 2: APPLICATIONS (P0: Student vs Application Separation) */}
+        {/* ========================================================================= */}
+        {activeTab === 'applications' && (
+          <div className="space-y-5">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 dark:border-slate-700 pb-4">
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <Layers size={17} className="text-red-600" />
+                    Student Licence Applications Pipeline ({applications.length})
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    1-to-Many architecture: Permanent Student ID remains attached to person, while each service receives its own Application ID.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setNewAppModalOpen(true)}
+                  className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-md transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus size={15} /> + New Service Application
+                </button>
+              </div>
+
               {applications.length === 0 ? (
                 <div className="text-center py-8 text-slate-400 text-xs">
                   No applications found. Click "+ New Service Application" to create one.

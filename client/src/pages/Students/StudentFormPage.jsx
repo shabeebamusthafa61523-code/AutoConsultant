@@ -83,7 +83,7 @@ const StudentFormPage = () => {
 
     // Section 4: Batch & Mandatory Next Action Workflow
     batch: '',
-    workflowStage: 'Registration',
+    workflowStage: 'Registered',
     currentStatus: 'Active',
     nextAction: 'Verify Documents',
     nextActionDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -175,7 +175,7 @@ const StudentFormPage = () => {
             admissionNumber: student.admissionNumber || '',
 
             batch: student.batch ? (typeof student.batch === 'object' ? student.batch._id : student.batch) : '',
-            workflowStage: student.workflowStage || 'Registration',
+            workflowStage: student.workflowStage || 'Registered',
             currentStatus: student.currentStatus || 'Active',
             nextAction: student.nextAction || 'Verify Documents',
             nextActionDueDate: student.nextActionDueDate ? new Date(student.nextActionDueDate).toISOString().split('T')[0] : (student.followUpDate ? new Date(student.followUpDate).toISOString().split('T')[0] : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
@@ -953,6 +953,8 @@ const StudentFormPage = () => {
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-mono"
               />
+            </div>
+
             <div className="sm:col-span-2 lg:col-span-3 pt-3 border-t border-slate-100 dark:border-slate-700">
               <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-3">

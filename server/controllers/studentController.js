@@ -1345,31 +1345,6 @@ const addStudentService = async (req, res, next) => {
   try {
     const { service, fee = 0, notes } = req.body;
     const student = await Student.findById(req.params.id);
-
-// @desc    Check duplicate student before creation
-// @route   GET /api/students/check-duplicate
-const checkDuplicate = async (req, res, next) => {
-  try {
-    const { mobile, alternateMobile, fullName } = req.query;
-    const existing = await checkDuplicateStudent({ mobile, alternateMobile, fullName });
-    if (existing) {
-      return res.json({
-        isDuplicate: true,
-        message: 'Possible Existing Student found in system',
-        duplicateStudent: existing
-      });
-    }
-    res.json({ isDuplicate: false });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// @desc    Get student class slip data for printing / download
-// @route   GET /api/students/:id/class-slip
-const getStudentClassSlip = async (req, res, next) => {
-  try {
-    const student = await Student.findById(req.params.id).populate('batch');
     if (!student) {
       res.status(404);
       throw new Error('Student not found');
@@ -1416,6 +1391,41 @@ const getStudentClassSlip = async (req, res, next) => {
       addedFee,
       oldTotalFee,
       newTotalFee
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Check duplicate student before creation
+// @route   GET /api/students/check-duplicate
+const checkDuplicate = async (req, res, next) => {
+  try {
+    const { mobile, alternateMobile, fullName } = req.query;
+    const existing = await checkDuplicateStudent({ mobile, alternateMobile, fullName });
+    if (existing) {
+      return res.json({
+        isDuplicate: true,
+        message: 'Possible Existing Student found in system',
+        duplicateStudent: existing
+      });
+    }
+    res.json({ isDuplicate: false });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get student class slip data for printing / download
+// @route   GET /api/students/:id/class-slip
+const getStudentClassSlip = async (req, res, next) => {
+  try {
+    const student = await Student.findById(req.params.id).populate('batch');
+    if (!student) {
+      res.status(404);
+      throw new Error('Student not found');
+    }
+
     const app = await Application.findOne({ student: student._id }).sort({ createdAt: -1 })
       .populate('primaryInstructor', 'name mobile')
       .populate('assignedVehicle', 'vehicleNumber');
