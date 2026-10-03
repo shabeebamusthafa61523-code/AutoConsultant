@@ -4,7 +4,7 @@ import MainLayout from '../../layouts/MainLayout';
 import Navbar from '../../components/Navbar';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
-import { createStudent, getStudentById, updateStudent } from '../../services/studentService';
+import { createStudent, getStudentById, updateStudent, checkDuplicateStudent } from '../../services/studentService';
 import { getBatches } from '../../services/batchService';
 import {
   Save,
@@ -19,7 +19,10 @@ import {
   User,
   Info,
   Phone,
-  MapPin
+  MapPin,
+  Calendar,
+  ExternalLink,
+  X
 } from 'lucide-react';
 
 const StudentFormPage = () => {
@@ -34,10 +37,16 @@ const StudentFormPage = () => {
   const [successMessage, setSuccessMessage] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // Duplicate student warning modal state
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
+  const [confirmedDuplicate, setConfirmedDuplicate] = useState(false);
+
   const [formData, setFormData] = useState({
     // Section 1: Basic Information
     fullName: '',
     aliasSourceName: '',
+    leadSource: 'Walk-in',
+    referral: '',
     gender: 'Male',
     dob: '',
     bloodGroup: '',
@@ -66,11 +75,13 @@ const StudentFormPage = () => {
     registrationDate: new Date().toISOString().split('T')[0],
     admissionNumber: '',
 
-    // Section 4: Batch & Workflow
+    // Section 4: Batch & Mandatory Next Action Workflow
     batch: '',
     workflowStage: 'Registration',
     currentStatus: 'Active',
-    nextAction: '',
+    nextAction: 'Verify Documents',
+    nextActionDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    nextActionPriority: 'Medium',
     followUpDate: '',
 
     // Section 5: Licence & RTO
@@ -109,6 +120,8 @@ const StudentFormPage = () => {
           setFormData({
             fullName: student.fullName || '',
             aliasSourceName: student.aliasSourceName || '',
+            leadSource: student.leadSource || 'Walk-in',
+            referral: student.referral || '',
             gender: student.gender || 'Male',
             dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
             bloodGroup: student.bloodGroup || '',
@@ -138,7 +151,9 @@ const StudentFormPage = () => {
             batch: student.batch ? (typeof student.batch === 'object' ? student.batch._id : student.batch) : '',
             workflowStage: student.workflowStage || 'Registration',
             currentStatus: student.currentStatus || 'Active',
-            nextAction: student.nextAction || '',
+            nextAction: student.nextAction || 'Verify Documents',
+            nextActionDueDate: student.nextActionDueDate ? new Date(student.nextActionDueDate).toISOString().split('T')[0] : (student.followUpDate ? new Date(student.followUpDate).toISOString().split('T')[0] : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+            nextActionPriority: student.nextActionPriority || 'Medium',
             followUpDate: student.followUpDate ? new Date(student.followUpDate).toISOString().split('T')[0] : '',
 
             applicationNo: student.applicationNo || '',
@@ -248,6 +263,15 @@ const StudentFormPage = () => {
       }
     }
 
+    // P0: Mandatory Next Action Enforcement
+    if (!formData.nextAction || !formData.nextAction.trim()) {
+      errors.nextAction = 'Next Action is mandatory on student records.';
+    }
+
+    if (!formData.nextActionDueDate) {
+      errors.nextActionDueDate = 'Next Action Due Date is mandatory.';
+    }
+
     if (totalFeeNum < 0) errors.totalFee = 'Total Fee must be a non-negative number.';
     if (paidNum < 0) errors.paidAmount = 'Paid Amount must be a non-negative number.';
     if (advanceNum < 0) errors.advanceAmount = 'Advance Amount must be a non-negative number.';
@@ -259,28 +283,26 @@ const StudentFormPage = () => {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
-    setSuccessMessage(null);
-
-    if (!validateForm()) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
+  const executeSave = async (overrideDuplicate = false) => {
     try {
       setSubmitting(true);
+      setError(null);
 
       const payload = {
         ...formData,
+        confirmDuplicate: overrideDuplicate || confirmedDuplicate,
         fullName: formData.fullName.trim(),
         aliasSourceName: formData.aliasSourceName ? formData.aliasSourceName.trim() : '',
+        leadSource: formData.leadSource || 'Walk-in',
+        referral: formData.referral ? formData.referral.trim() : '',
+        nextAction: formData.nextAction.trim(),
+        nextActionDueDate: formData.nextActionDueDate,
+        nextActionPriority: formData.nextActionPriority || 'Medium',
+        followUpDate: formData.nextActionDueDate || formData.followUpDate || null,
         totalFee: totalFeeNum,
         paidAmount: paidNum,
         advanceAmount: advanceNum,
         batch: formData.batch || null,
-        followUpDate: formData.followUpDate || null,
         testDate: formData.testDate || null,
         dob: formData.dob || null
       };
@@ -304,6 +326,47 @@ const StudentFormPage = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMessage(null);
+
+    if (!validateForm()) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // P0: Duplicate Student Detection before save
+    if (!isEdit && !confirmedDuplicate) {
+      try {
+        setSubmitting(true);
+        const dupRes = await checkDuplicateStudent({
+          mobile: formData.primaryMobile,
+          alternateMobile: formData.alternateMobile,
+          fullName: formData.fullName
+        });
+
+        if (dupRes && dupRes.isDuplicate && dupRes.duplicateStudent) {
+          setSubmitting(false);
+          setDuplicateWarning(dupRes.duplicateStudent);
+          return;
+        }
+      } catch (dupErr) {
+        console.warn('Duplicate check warning:', dupErr);
+      } finally {
+        setSubmitting(false);
+      }
+    }
+
+    await executeSave();
+  };
+
+  const handleContinueAnyway = async () => {
+    setConfirmedDuplicate(true);
+    setDuplicateWarning(null);
+    await executeSave(true);
   };
 
   if (loading) {
@@ -461,14 +524,49 @@ const StudentFormPage = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Alias / Referral Source
+                Alias / Pet Name
               </label>
               <input
                 type="text"
                 name="aliasSourceName"
                 value={formData.aliasSourceName}
                 onChange={handleChange}
-                placeholder="e.g. Walk-in, Jasirata, Sahla C/O"
+                placeholder="e.g. Jasir, Kunjumon"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Lead Source
+              </label>
+              <select
+                name="leadSource"
+                value={formData.leadSource}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium"
+              >
+                <option value="Walk-in">Walk-in</option>
+                <option value="Referral">Referral</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Instagram">Instagram</option>
+                <option value="Facebook">Facebook</option>
+                <option value="Google">Google Search</option>
+                <option value="Local Campaign">Local Campaign</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Referral Details / Reference
+              </label>
+              <input
+                type="text"
+                name="referral"
+                value={formData.referral}
+                onChange={handleChange}
+                placeholder="e.g. Sahla C/O, Old Student"
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
               />
             </div>
@@ -699,6 +797,82 @@ const StudentFormPage = () => {
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
               />
             </div>
+
+            <div className="sm:col-span-2 lg:col-span-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+              <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Calendar size={15} className="text-amber-600 dark:text-amber-400" />
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wide">
+                    Mandatory Next Action (R&D Operating Requirement)
+                  </h4>
+                  <span className="text-[10px] bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded">
+                    Required
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Next Action Description <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="nextAction"
+                      required
+                      value={formData.nextAction}
+                      onChange={handleChange}
+                      placeholder="e.g. Verify Documents, Schedule LL Test"
+                      className={`w-full px-3 py-2 border rounded-md text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 ${
+                        fieldErrors.nextAction ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 dark:border-slate-700'
+                      }`}
+                    />
+                    {fieldErrors.nextAction && (
+                      <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.nextAction}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Due Date <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="nextActionDueDate"
+                      required
+                      value={formData.nextActionDueDate}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-md text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 ${
+                        fieldErrors.nextActionDueDate ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 dark:border-slate-700'
+                      }`}
+                    />
+                    {fieldErrors.nextActionDueDate && (
+                      <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.nextActionDueDate}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Priority Level
+                    </label>
+                    <select
+                      name="nextActionPriority"
+                      value={formData.nextActionPriority}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-semibold"
+                    >
+                      <option value="Low">Low Priority</option>
+                      <option value="Medium">Medium Priority</option>
+                      <option value="High">High Priority</option>
+                      <option value="Urgent">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -864,6 +1038,76 @@ const StudentFormPage = () => {
           </button>
         </div>
       </form>
+
+      {/* P0: Duplicate Student Warning Modal */}
+      {duplicateWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-amber-300 dark:border-amber-600 max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <AlertCircle size={22} />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  Possible Existing Student
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  This person may already exist.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg p-3.5 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Name:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100">{duplicateWarning.fullName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Mobile:</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{duplicateWarning.primaryMobile}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Student ID:</span>
+                <span className="font-mono font-bold text-red-600 dark:text-red-400">{duplicateWarning.studentId}</span>
+              </div>
+              {duplicateWarning.currentStatus && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Status:</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{duplicateWarning.currentStatus}</span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              Review existing record before creating a duplicate to prevent split records and fragmented payments.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => window.open(`/students/${duplicateWarning._id}`, '_blank')}
+                className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-md text-xs font-bold transition flex items-center justify-center gap-1.5"
+              >
+                <ExternalLink size={13} /> View Existing Student
+              </button>
+              <button
+                type="button"
+                onClick={handleContinueAnyway}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-bold transition"
+              >
+                Continue Anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => setDuplicateWarning(null)}
+                className="px-3 py-2 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-md text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 };

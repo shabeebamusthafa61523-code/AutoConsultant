@@ -23,6 +23,9 @@ const vehicleRoutes = require('./routes/vehicleRoutes');
 const studentDocumentRoutes = require('./routes/studentDocumentRoutes');
 const complaintRoutes = require('./routes/complaintRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
+const applicationRoutes = require('./routes/applicationRoutes');
+const migrationRoutes = require('./routes/migrationRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 // Connect to MongoDB Atlas
 connectDB();
@@ -59,12 +62,48 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/student-documents', studentDocumentRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/applications', applicationRoutes);
+app.use('/api/migration', migrationRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Centralized Error Handler
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
+
+// Startup error handling: catch EADDRINUSE and report clearly
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ Error: Port ${PORT} is already in use.`);
+    console.error(`Stop the existing BENZ CRM backend process or use another PORT.\n`);
+    process.exit(1);
+  } else {
+    console.error('\n❌ Server startup error:', err);
+    process.exit(1);
+  }
+});
+
+// Graceful shutdown handling for clean stop/restart
+const handleShutdown = (signal) => {
+  console.log(`\n${signal} received. Closing BENZ CRM server gracefully...`);
+  server.close(async () => {
+    console.log('HTTP server closed.');
+    try {
+      const mongoose = require('mongoose');
+      await mongoose.connection.close(false);
+      console.log('MongoDB connection closed.');
+    } catch (dbErr) {
+      console.error('Error closing MongoDB connection:', dbErr);
+    }
+    process.exit(0);
+  });
+};
+
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+
+module.exports = app;

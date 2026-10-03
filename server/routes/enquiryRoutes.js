@@ -8,6 +8,9 @@ const {
   convertEnquiryToStudent,
   deleteEnquiry
 } = require('../controllers/enquiryController');
+const { protect, authorize } = require('../middleware/authMiddleware');
+
+router.use(protect);
 
 router.route('/')
   .get(getEnquiries)
@@ -18,6 +21,6 @@ router.post('/:id/convert', convertEnquiryToStudent);
 router.route('/:id')
   .get(getEnquiryById)
   .put(updateEnquiry)
-  .delete(deleteEnquiry);
+  .delete(authorize('Superadmin', 'Admin', 'Manager'), deleteEnquiry);
 
 module.exports = router;
