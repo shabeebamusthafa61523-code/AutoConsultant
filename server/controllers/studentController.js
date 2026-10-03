@@ -60,6 +60,9 @@ const ensureStudentApplication = async (student) => {
     const appId = await generateApplicationId();
     const pkgFee = student.totalFee || 9000;
     const paid = (student.paidAmount || 0) + (student.advanceAmount || 0);
+    const validAppStatuses = ['Lead', 'Registered', 'Documents Pending', 'LL Processing', 'LL Approved', 'Training', 'Test Scheduled', 'Retest', 'Test Passed', 'Licence Processing', 'Completed', 'On Hold', 'Cancelled'];
+    const mappedLifecycle = validAppStatuses.includes(student.currentStatus) ? student.currentStatus : 'Registered';
+
     app = await Application.create({
       applicationId: appId,
       student: student._id,
@@ -69,7 +72,7 @@ const ensureStudentApplication = async (student) => {
       vehicleClass: student.vehicleType || '4 Wheeler',
       coursePackage: student.coursePackage || 'LMV+MCWG (Fresh Licence)',
       applicationDate: student.registrationDate || student.createdAt || new Date(),
-      lifecycleStatus: student.currentStatus || 'Registered',
+      lifecycleStatus: mappedLifecycle,
       batch: student.batch || null,
       feeStructure: {
         packageFee: pkgFee,
@@ -1066,7 +1069,7 @@ const bulkImportStudents = async (req, res, next) => {
         vehicleClass: newStudent.vehicleType || '4 Wheeler',
         coursePackage: newStudent.coursePackage || 'LMV+MCWG (Fresh Licence)',
         applicationDate: newStudent.registrationDate || new Date(),
-        lifecycleStatus: newStudent.currentStatus || 'Registered',
+        lifecycleStatus: ['Lead', 'Registered', 'Documents Pending', 'LL Processing', 'LL Approved', 'Training', 'Test Scheduled', 'Retest', 'Test Passed', 'Licence Processing', 'Completed', 'On Hold', 'Cancelled'].includes(newStudent.currentStatus) ? newStudent.currentStatus : 'Registered',
         batch: batchId || null,
         feeStructure: {
           packageFee: totalFee,

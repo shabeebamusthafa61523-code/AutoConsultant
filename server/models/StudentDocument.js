@@ -30,6 +30,7 @@ const studentDocumentSchema = new mongoose.Schema(
       required: [true, 'Document type is required'],
       enum: [
         'Aadhaar / ID',
+        'Aadhaar Card',
         'Photo',
         'Address Proof',
         'Blood Group',
