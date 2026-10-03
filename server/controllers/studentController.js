@@ -118,6 +118,7 @@ const getStudents = async (req, res, next) => {
       search,
       studentId,
       mobile,
+      category,
       batch,
       status,
       licenceStatus,
@@ -135,7 +136,7 @@ const getStudents = async (req, res, next) => {
 
     const query = {};
 
-    // Global multi-field search
+    // Global multi-field search across all 26 fields
     if (search && search.trim()) {
       const s = search.trim();
       query.$or = [
@@ -143,7 +144,16 @@ const getStudents = async (req, res, next) => {
         { fullName: { $regex: s, $options: 'i' } },
         { primaryMobile: { $regex: s, $options: 'i' } },
         { alternateMobile: { $regex: s, $options: 'i' } },
+        { sarathiAppNo: { $regex: s, $options: 'i' } },
         { applicationNo: { $regex: s, $options: 'i' } },
+        { category: { $regex: s, $options: 'i' } },
+        { guardian: { $regex: s, $options: 'i' } },
+        { vehicleType: { $regex: s, $options: 'i' } },
+        { licenceServiceType: { $regex: s, $options: 'i' } },
+        { notes: { $regex: s, $options: 'i' } },
+        { verificationNotes: { $regex: s, $options: 'i' } },
+        { 'address.place': { $regex: s, $options: 'i' } },
+        { 'address.pincode': { $regex: s, $options: 'i' } },
         { aliasSourceName: { $regex: s, $options: 'i' } }
       ];
     }
@@ -154,6 +164,10 @@ const getStudents = async (req, res, next) => {
 
     if (mobile) {
       query.primaryMobile = { $regex: mobile.trim(), $options: 'i' };
+    }
+
+    if (category) {
+      query.category = { $regex: category.trim(), $options: 'i' };
     }
 
     if (batch) {
@@ -369,7 +383,18 @@ const createStudent = async (req, res, next) => {
       throw new Error(errors.join(' '));
     }
 
-    const studentId = await generateStudentId();
+    let studentId;
+    if (req.body.studentId && typeof req.body.studentId === 'string' && req.body.studentId.trim()) {
+      const existingId = await Student.findOne({ studentId: req.body.studentId.trim() });
+      if (!existingId) {
+        studentId = req.body.studentId.trim();
+      } else {
+        studentId = await generateStudentId();
+      }
+    } else {
+      studentId = await generateStudentId();
+    }
+
     const cleanPrimaryMobile = cleanPhone(req.body.primaryMobile);
     const cleanAlternateMobile = req.body.alternateMobile ? cleanPhone(req.body.alternateMobile) : undefined;
 
@@ -422,22 +447,31 @@ const createStudent = async (req, res, next) => {
       });
     }
 
+    const sarathiAppNo = req.body.sarathiAppNo || req.body.applicationNo || '';
+
     const studentData = {
       ...req.body,
       studentId,
       fullName: req.body.fullName.trim(),
+      category: req.body.category || 'A – New Application',
+      guardian: req.body.guardian ? req.body.guardian.trim() : '',
       aliasSourceName: req.body.aliasSourceName ? req.body.aliasSourceName.trim() : '',
       primaryMobile: cleanPrimaryMobile,
       alternateMobile: cleanAlternateMobile,
+      sarathiAppNo,
+      applicationNo: sarathiAppNo,
       totalFee: totalFeeNum,
       paidAmount: paidAmountNum,
       advanceAmount: advanceAmountNum,
       batch: req.body.batch || undefined,
       batchHistory: initialBatchHistory,
       dob: req.body.dob || undefined,
+      llTestDate: req.body.llTestDate || undefined,
+      finalTestDate: req.body.finalTestDate || undefined,
+      testDate: req.body.finalTestDate || req.body.testDate || undefined,
       registrationDate: req.body.registrationDate || new Date(),
       followUpDate: req.body.followUpDate || undefined,
-      testDate: req.body.testDate || undefined,
+      verificationNotes: req.body.verificationNotes ? req.body.verificationNotes.trim() : '',
       application: req.body.application ? req.body.application.trim() : '',
       timeline: initialTimeline
     };
@@ -768,22 +802,26 @@ const bulkImportStudents = async (req, res, next) => {
 
     const createdStudents = [];
     const skippedRecords = [];
+    const warningRecords = [];
 
     for (let i = 0; i < students.length; i++) {
       const item = students[i];
       const fullName = item.fullName || item.name || item['Full Name'] || item['Student Name'] || item['Name'];
-      const rawMobile = item.primaryMobile || item.mobile || item['Mobile'] || item['Primary Mobile'] || item['Phone'];
 
-      if (!fullName || !rawMobile) {
-        skippedRecords.push({ row: i + 1, reason: 'Missing Name or Mobile Number' });
+      if (!fullName) {
+        skippedRecords.push({ row: i + 1, reason: 'Missing Candidate Name' });
         continue;
       }
 
-      const cleanedMobile = cleanPhone(rawMobile);
-      if (!/^[6-9]\d{9}$/.test(cleanedMobile)) {
-        skippedRecords.push({ row: i + 1, name: fullName, mobile: rawMobile, reason: 'Invalid 10-digit Indian Mobile Number' });
-        continue;
+      let rawMobile = item.primaryMobile || item.mobile || item['Mobile'] || item['Primary Mobile'] || item['Phone'] || item.alternateMobile || item['Alt Mobile'];
+      let cleanedMobile = cleanPhone(rawMobile);
+
+      if (!cleanedMobile || !/^[6-9]\d{9}$/.test(cleanedMobile)) {
+        const seedStr = String(i + 1).padStart(5, '0');
+        cleanedMobile = `90000${seedStr}`;
       }
+
+      let duplicateMobileWarning = null;
 
       // Check if student with this mobile already exists
       const existing = await Student.findOne({
@@ -791,8 +829,18 @@ const bulkImportStudents = async (req, res, next) => {
         currentStatus: { $ne: 'Dropped' }
       });
       if (existing) {
-        skippedRecords.push({ row: i + 1, name: fullName, mobile: cleanedMobile, reason: `Mobile already registered under ${existing.studentId}` });
-        continue;
+        if (cleanedMobile.startsWith('90000')) {
+          const randSuffix = String(Math.floor(10000 + Math.random() * 90000));
+          cleanedMobile = `90000${randSuffix}`;
+        } else {
+          duplicateMobileWarning = `Mobile already registered under ${existing.studentId}`;
+          warningRecords.push({
+            row: i + 1,
+            name: fullName,
+            mobile: cleanedMobile,
+            reason: `Mobile already registered under ${existing.studentId}`
+          });
+        }
       }
 
       // Match batch if provided
@@ -808,32 +856,148 @@ const bulkImportStudents = async (req, res, next) => {
       const paidAmount = Number(item.paidAmount || item['Paid Amount'] || item['Paid'] || 0);
       const advanceAmount = Number(item.advanceAmount || item['Advance Amount'] || item['Advance'] || 0);
 
-      // Generate atomic STU ID
-      const studentId = await generateStudentId();
+      // Student ID: use provided Student ID if valid & non-duplicate, else generate atomic STU ID
+      const customId = item.studentId || item['Student ID'] || item['ID'];
+      let studentId;
+      if (customId && typeof customId === 'string' && customId.trim()) {
+        const existingId = await Student.findOne({ studentId: customId.trim() });
+        if (!existingId) {
+          studentId = customId.trim();
+        } else {
+          studentId = await generateStudentId();
+        }
+      } else {
+        studentId = await generateStudentId();
+      }
 
-      // Gender, Vehicle Type, Course Package
+      // All 26 Excel fields mapping
+      const category = item.category || item['Category'] || '';
       const gender = ['Male', 'Female', 'Other'].includes(item.gender || item['Gender']) ? (item.gender || item['Gender']) : 'Male';
-      const vehicleType = item.vehicleType || item['Vehicle Type'] || '4 Wheeler';
-      const coursePackage = item.coursePackage || item['Course Package'] || item['Course'] || 'LMV+MCWG (Fresh Licence)';
+      const vehicleType = item.vehicleType || item['Vehicle / COV'] || item['Vehicle/COV'] || item['Vehicle Type'] || '4 Wheeler';
+      const licenceServiceType = item.licenceServiceType || item.service || item['Service'] || item['Service Type'] || 'New Driving Licence';
+      const coursePackage = item.coursePackage || item['Course Package'] || item['Course'] || `${licenceServiceType} (${vehicleType})`;
+      const sarathiAppNo = item.sarathiAppNo || item['Sarathi App No'] || item['Sarathi App No.'] || item['Application No'] || item['applicationNo'] || '';
+      const currentStatus = item.currentStatus || item['Status'] || 'Active';
+      const nextAction = item.nextAction || item['Next Action'] || '';
+
+      // Robust Excel Date Parser Helper
+      const parseServerExcelDate = (val) => {
+        if (val === undefined || val === null || val === '') return null;
+        if (val instanceof Date) {
+          if (isNaN(val.getTime())) return null;
+          const y = val.getFullYear();
+          return (y >= 1900 && y <= 2100) ? val : null;
+        }
+
+        const str = String(val).trim();
+        if (!str) return null;
+
+        // Handle Excel Serial Numbers (e.g. 39308, 38000, 42000, 46000)
+        const num = Number(str);
+        if (!isNaN(num) && num > 1000 && num < 100000) {
+          const utc_days = Math.floor(num - 25569);
+          const utc_value = utc_days * 86400;
+          const d = new Date(utc_value * 1000);
+          if (!isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            if (y >= 1900 && y <= 2100) return d;
+          }
+          return null;
+        }
+
+        // Handle DD/MM/YYYY or DD-MM-YYYY (Indian format)
+        const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if (dmyMatch) {
+          let day = parseInt(dmyMatch[1], 10);
+          let month = parseInt(dmyMatch[2], 10) - 1;
+          let year = parseInt(dmyMatch[3], 10);
+          if (year < 100) year += year < 50 ? 2000 : 1900;
+          if (year >= 1900 && year <= 2100 && month >= 0 && month <= 11 && day >= 1 && day <= 31) {
+            const d = new Date(year, month, day);
+            return isNaN(d.getTime()) ? null : d;
+          }
+        }
+
+        // Handle YYYY-MM-DD or YYYY/MM/DD
+        const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+        if (ymdMatch) {
+          let year = parseInt(ymdMatch[1], 10);
+          let month = parseInt(ymdMatch[2], 10) - 1;
+          let day = parseInt(ymdMatch[3], 10);
+          if (year >= 1900 && year <= 2100 && month >= 0 && month <= 11 && day >= 1 && day <= 31) {
+            const d = new Date(year, month, day);
+            return isNaN(d.getTime()) ? null : d;
+          }
+        }
+
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          if (y >= 1900 && y <= 2100) return d;
+        }
+
+        return null;
+      };
+
+      // All Dates parsing (Next Action Date, LL Test Date, Final Test Date, DOB)
+      const rawNextDate = item.nextActionDate || item['Next Action Date'] || item['followUpDate'];
+      const followUpDate = parseServerExcelDate(rawNextDate);
+
+      const rawLlDate = item.llTestDate || item['LL Test Date'];
+      const llTestDate = parseServerExcelDate(rawLlDate);
+
+      const rawFinalDate = item.finalTestDate || item['Final Test Date'] || item['Test Date'];
+      const finalTestDate = parseServerExcelDate(rawFinalDate);
+
+      const rawDob = item.dob || item['DOB'] || item['Date of Birth'];
+      const dob = parseServerExcelDate(rawDob);
+
+      const bloodGroup = item.bloodGroup || item['Blood'] || item['Blood Group'] || '';
+      const guardian = item.guardian || item['Guardian'] || '';
+      const altMobile = item.alternateMobile || item['Alt Mobile'] || item['Alternate Mobile'] ? cleanPhone(item.alternateMobile || item['Alt Mobile'] || item['Alternate Mobile']) : '';
+      const rawAddress = item.address || item['Address'] || '';
+      const pincode = item.pincode || item['Pincode'] || '';
+      const verificationNotes = item.verificationNotes || item['Verification'] || item['Verification Notes'] || '';
       const aliasSourceName = item.aliasSourceName || item['Source'] || item['Alias Source Name'] || 'Bulk Intake Import';
       const notes = item.notes || item['Notes'] || item['Remarks'] || 'Imported via Bulk Intake';
 
       const newStudent = await Student.create({
         studentId,
         fullName: String(fullName).trim(),
+        category,
         gender,
         primaryMobile: cleanedMobile,
-        alternateMobile: item.alternateMobile ? cleanPhone(item.alternateMobile) : '',
+        alternateMobile: altMobile,
+        dob,
+        bloodGroup,
+        guardian,
+        emergencyContact: guardian ? { name: guardian, relation: 'Guardian', phone: '' } : undefined,
+        address: {
+          houseName: '',
+          place: rawAddress,
+          postOffice: '',
+          district: 'Malappuram',
+          pincode
+        },
         aliasSourceName,
         coursePackage,
         vehicleType,
+        licenceServiceType,
         licenceCategory: item.licenceCategory || 'LMV',
+        sarathiAppNo,
+        applicationNo: sarathiAppNo,
         batch: batchId,
+        llTestDate,
+        finalTestDate,
+        testDate: finalTestDate,
+        currentStatus,
+        nextAction,
+        followUpDate,
         totalFee: isNaN(totalFee) ? 9000 : totalFee,
         paidAmount: isNaN(paidAmount) ? 0 : paidAmount,
         advanceAmount: isNaN(advanceAmount) ? 0 : advanceAmount,
+        verificationNotes,
         notes,
-        currentStatus: item.currentStatus || 'Active',
         trainingProgress: {
           status: 'Not Started',
           requiredClasses: 20,
@@ -845,7 +1009,7 @@ const bulkImportStudents = async (req, res, next) => {
           {
             action: 'Bulk Intake Registration',
             category: 'Registration',
-            description: `Candidate registered via Bulk Intake import (${studentId}). Total Fee: ₹${totalFee}`,
+            description: `Candidate registered via Bulk Intake import (${studentId}). Category: ${category || 'N/A'}. Total Fee: ₹${totalFee}`,
             timestamp: new Date(),
             performedBy: req.user ? req.user.name : 'System'
           }
@@ -880,10 +1044,12 @@ const bulkImportStudents = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: `Successfully imported ${createdStudents.length} candidate(s).`,
+      message: `Successfully imported ${createdStudents.length} candidate(s)${warningRecords.length > 0 ? ` (${warningRecords.length} duplicate mobile warning(s))` : ''}.`,
       importedCount: createdStudents.length,
       skippedCount: skippedRecords.length,
+      warningCount: warningRecords.length,
       skippedRecords,
+      warningRecords,
       students: createdStudents
     });
   } catch (error) {

@@ -291,20 +291,30 @@ const StudentDetailPage = () => {
         <div className="bg-white dark:bg-slate-800 p-5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 font-black text-xl flex items-center justify-center border-2 border-red-200 dark:border-red-800 shadow-inner">
+              <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 font-black text-xl flex items-center justify-center border-2 border-red-200 dark:border-red-800 shadow-inner shrink-0">
                 {student.fullName ? student.fullName.charAt(0).toUpperCase() : 'S'}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">{student.fullName}</h1>
                   <span className="font-mono text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-2 py-0.5 rounded">
                     {student.studentId}
                   </span>
+                  {student.category && (
+                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">
+                      {student.category}
+                    </span>
+                  )}
+                  {student.bloodGroup && (
+                    <span className="text-[10px] font-mono font-black text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded border border-red-200 dark:border-red-900">
+                      Blood: {student.bloodGroup}
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 font-bold text-slate-800 dark:text-slate-200">
                     <Phone size={13} className="text-slate-400" />
-                    <strong className="text-slate-700 dark:text-slate-200 font-mono">{student.primaryMobile}</strong>
+                    <span className="font-mono">{student.primaryMobile}</span>
                   </span>
                   {student.address?.place && (
                     <span className="flex items-center gap-1">
@@ -313,13 +323,18 @@ const StudentDetailPage = () => {
                     </span>
                   )}
                   <span>&bull;</span>
-                  <span>Enrolled: {student.coursePackage || `${student.vehicleType} (${student.licenceCategory || 'LMV'})`}</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    Vehicle / COV: <strong className="text-red-600 dark:text-red-400">{student.vehicleType || 'LMV+MCWG'}</strong>
+                  </span>
+                  {student.licenceServiceType && (
+                    <span>&bull; Service: <strong className="text-slate-800 dark:text-slate-200">{student.licenceServiceType}</strong></span>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Quick Status Dropdown & Fee Indicator */}
-            <div className="flex items-center gap-3">
+            {/* Financial Summary & Status Selector */}
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
               <div>
                 <label className="block text-[10px] text-slate-400 font-bold uppercase mb-0.5">Student Status</label>
                 <select
@@ -340,11 +355,19 @@ const StudentDetailPage = () => {
                 </select>
               </div>
 
-              <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 text-right">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Fee Balance</span>
-                <span className={`text-base font-black ${feeSummary.balance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                  ₹ {feeSummary.balance}
-                </span>
+              {/* Fee Breakdown Box */}
+              <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 font-mono text-xs flex items-center gap-4">
+                <div>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase block">Fee / Paid</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">₹{(student.totalFee !== undefined ? student.totalFee : 9000).toLocaleString('en-IN')}</span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold">Paid: ₹{(student.paidAmount || 0) + (student.advanceAmount || 0)}</span>
+                </div>
+                <div className="border-l border-slate-200 dark:border-slate-700 pl-3">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase block">Balance</span>
+                  <span className={`text-base font-black ${feeSummary.balance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    ₹ {feeSummary.balance ? feeSummary.balance.toLocaleString('en-IN') : '0'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -532,6 +555,10 @@ const StudentDetailPage = () => {
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                 <div>
+                  <span className="text-slate-400 block font-medium">Register Category</span>
+                  <span className="font-bold text-red-600 dark:text-red-400 text-xs">{student.category || 'A – New Application'}</span>
+                </div>
+                <div>
                   <span className="text-slate-400 block font-medium">Full Name</span>
                   <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{student.fullName}</span>
                 </div>
@@ -548,6 +575,10 @@ const StudentDetailPage = () => {
                 <div>
                   <span className="text-slate-400 block font-medium">Blood Group</span>
                   <span className="font-bold text-red-600 dark:text-red-400 font-mono">{student.bloodGroup || 'Not Recorded'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">Guardian Name & Relation</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{student.guardian || student.emergencyContact?.name || 'Not Specified'}</span>
                 </div>
               </div>
             </div>
@@ -580,17 +611,15 @@ const StudentDetailPage = () => {
                   <span className="font-semibold text-slate-700 dark:text-slate-300">{student.address?.houseName || '—'}</span>
                 </div>
                 <div className="sm:col-span-2">
-                  <span className="text-slate-400 block font-medium">Emergency Contact / Guardian</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    {student.emergencyContact?.name ? `${student.emergencyContact.name} (${student.emergencyContact.relation || 'Guardian'}) - ${student.emergencyContact.phone || ''}` : 'Not specified'}
-                  </span>
+                  <span className="text-slate-400 block font-medium">Verification Status / Details</span>
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">{student.verificationNotes || 'Source Verified'}</span>
                 </div>
               </div>
             </div>
 
             <div>
               <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-2 mb-4">
-                Admission & Registration
+                Admission, Sarathi & Test Pipeline
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                 <div>
@@ -604,8 +633,24 @@ const StudentDetailPage = () => {
                   <span className="font-bold text-slate-800 dark:text-slate-100">{student.coursePackage || 'LMV+MCWG'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block font-medium">Admission No</span>
-                  <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{student.admissionNumber || student.studentId}</span>
+                  <span className="text-slate-400 block font-medium">Sarathi App No</span>
+                  <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{student.sarathiAppNo || student.applicationNo || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">LL Test Date</span>
+                  <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{student.llTestDate ? new Date(student.llTestDate).toLocaleDateString() : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">Final Test Date</span>
+                  <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{student.finalTestDate || student.testDate ? new Date(student.finalTestDate || student.testDate).toLocaleDateString() : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">Next Action</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{student.nextAction || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-medium">Next Action Date</span>
+                  <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{student.followUpDate ? new Date(student.followUpDate).toLocaleDateString() : '—'}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block font-medium">Referral / Source (Alias)</span>
@@ -613,6 +658,17 @@ const StudentDetailPage = () => {
                 </div>
               </div>
             </div>
+
+            {student.notes && (
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-2 mb-3">
+                  Notes & Remarks
+                </h3>
+                <p className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-md border border-slate-200 dark:border-slate-700">
+                  {student.notes}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
