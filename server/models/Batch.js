@@ -91,6 +91,25 @@ const batchSchema = new mongoose.Schema(
   }
 );
 
+// Virtuals for R&D compatibility: batchId, timeSlot, capacity, availableSeats
+batchSchema.virtual('batchId').get(function () {
+  return this.batchNumber || `BAT-${String(this._id).slice(-4).toUpperCase()}`;
+});
+
+batchSchema.virtual('capacity')
+  .get(function () { return this.maxStudents || 20; })
+  .set(function (val) { this.maxStudents = val; });
+
+batchSchema.virtual('timeSlot').get(function () {
+  return `${this.startTime || ''} - ${this.endTime || ''}`.trim();
+});
+
+batchSchema.virtual('availableSeats').get(function () {
+  const cap = this.maxStudents || 20;
+  const active = this.activeStudents || 0;
+  return Math.max(0, cap - active);
+});
+
 batchSchema.index({ status: 1, startDate: -1 });
 
 module.exports = mongoose.model('Batch', batchSchema);

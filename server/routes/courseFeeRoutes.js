@@ -7,14 +7,17 @@ const {
   updateCourseFee,
   deleteCourseFee
 } = require('../controllers/courseFeeController');
+const { protect, authorize } = require('../middleware/authMiddleware');
+
+router.use(protect);
 
 router.route('/')
   .get(getCourseFees)
-  .post(createCourseFee);
+  .post(authorize('Superadmin', 'Admin', 'Manager'), createCourseFee);
 
 router.route('/:id')
   .get(getCourseFeeById)
-  .put(updateCourseFee)
-  .delete(deleteCourseFee);
+  .put(authorize('Superadmin', 'Admin', 'Manager'), updateCourseFee)
+  .delete(authorize('Superadmin', 'Admin', 'Manager'), deleteCourseFee);
 
 module.exports = router;

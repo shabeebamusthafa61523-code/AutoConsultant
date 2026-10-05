@@ -9,5 +9,10 @@ export const updateStudentStatus = (id, data) => API.patch(`/students/${id}/stat
 export const transferStudentBatch = (id, data) => API.post(`/students/${id}/batch-transfer`, data);
 export const addStudentDocument = (id, data) => API.post(`/students/${id}/documents`, data);
 export const updateDocumentStatus = (id, docId, data) => API.patch(`/students/${id}/documents/${docId}`, data);
+export const addStudentService = (id, data) => API.post(`/students/${id}/add-service`, data);
 export const deleteStudent = (id) => API.delete(`/students/${id}`);
 export const bulkImportStudents = (students) => API.post('/students/bulk-import', { students });
+export const checkDuplicateStudent = (params) => API.get('/students/check-duplicate', { params });
+export const getStudentClassSlip = (id) => API.get(`/students/${id}/class-slip`);
+export const globalSearch = (q) => API.get('/students/global-search', { params: { q } });
+

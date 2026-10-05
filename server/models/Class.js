@@ -36,6 +36,38 @@ const classSchema = new mongoose.Schema(
       type: String,
       default: 'Practical Driving'
     },
+    application: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Application',
+      default: null,
+      index: true
+    },
+    applicationId: {
+      type: String,
+      trim: true,
+      default: '',
+      index: true
+    },
+    kmStart: {
+      type: Number,
+      default: 0
+    },
+    kmEnd: {
+      type: Number,
+      default: 0
+    },
+    kmDriven: {
+      type: Number,
+      default: 0
+    },
+    duration: {
+      type: Number,
+      default: 60 // in minutes
+    },
+    hPracticeCount: {
+      type: Number,
+      default: 0
+    },
     km: {
       type: Number,
       default: 0
@@ -129,10 +161,10 @@ classSchema.virtual('type')
   .get(function () { return this.trainingType; })
   .set(function (v) { this.trainingType = v; });
 
-// Virtual for exact unrounded equivalent classes calculation: (Road KM / 5) + (H / 3) + Bike Classes
+// Virtual for exact unrounded equivalent classes calculation: (Road KM / 5) + (H Practices / 3) + Bike Classes
 classSchema.virtual('equivalentClasses').get(function () {
-  const kmPart = (this.km || 0) / 5;
-  const hPart = (this.hours || 0) / 3;
+  const kmPart = (this.kmDriven || this.km || 0) / 5;
+  const hPart = (this.hPracticeCount || this.hClassCount || this.hours || 0) / 3;
   const bikePart = this.bikeClassCount || 0;
   return kmPart + hPart + bikePart;
 });
@@ -146,9 +178,18 @@ classSchema.index({ classDate: -1 });
 classSchema.index({ status: 1, classDate: -1 });
 classSchema.index({ createdAt: -1 });
 
-// Pre-save hook to populate textual instructor/vehicle names if references are supplied
+// Pre-save hook to auto-calculate kmDriven and populate textual instructor/vehicle names
 classSchema.pre('save', async function (next) {
   try {
+    if (this.kmEnd !== undefined && this.kmStart !== undefined && this.kmEnd > this.kmStart) {
+      this.kmDriven = this.kmEnd - this.kmStart;
+      this.km = this.kmDriven;
+    } else if (this.kmDriven > 0) {
+      this.km = this.kmDriven;
+    } else if (this.km > 0 && (!this.kmDriven || this.kmDriven === 0)) {
+      this.kmDriven = this.km;
+    }
+
     if (this.isModified('instructorRef') && this.instructorRef) {
       const Instructor = mongoose.model('Instructor');
       const ins = await Instructor.findById(this.instructorRef).select('name');

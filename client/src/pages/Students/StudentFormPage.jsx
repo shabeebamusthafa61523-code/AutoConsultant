@@ -4,8 +4,9 @@ import MainLayout from '../../layouts/MainLayout';
 import Navbar from '../../components/Navbar';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
-import { createStudent, getStudentById, updateStudent } from '../../services/studentService';
+import { createStudent, getStudentById, updateStudent, checkDuplicateStudent } from '../../services/studentService';
 import { getBatches } from '../../services/batchService';
+import { getCourseFees } from '../../services/courseFeeService';
 import {
   Save,
   ArrowLeft,
@@ -19,7 +20,10 @@ import {
   User,
   Info,
   Phone,
-  MapPin
+  MapPin,
+  Calendar,
+  ExternalLink,
+  X
 } from 'lucide-react';
 
 const StudentFormPage = () => {
@@ -28,19 +32,29 @@ const StudentFormPage = () => {
   const isEdit = Boolean(id);
 
   const [batches, setBatches] = useState([]);
+  const [availableServices, setAvailableServices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // Duplicate student warning modal state
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
+  const [confirmedDuplicate, setConfirmedDuplicate] = useState(false);
+
   const [formData, setFormData] = useState({
-    // Section 1: Basic Information
+    // Section 1: Basic Information & Register Identity
+    category: 'A – New Application',
+    studentId: '',
     fullName: '',
     aliasSourceName: '',
+    leadSource: 'Walk-in',
+    referral: '',
     gender: 'Male',
     dob: '',
     bloodGroup: '',
+    guardian: '',
 
     // Section 2: Contact & Address
     primaryMobile: '',
@@ -54,31 +68,38 @@ const StudentFormPage = () => {
     },
     emergencyContact: {
       name: '',
-      relation: 'Parent',
+      relation: 'Guardian',
       phone: ''
     },
 
     // Section 3: Course & Package
     coursePackage: 'LMV+MCWG (Fresh Licence)',
-    licenceServiceType: 'Fresh Licence',
+    services: [],
+    licenceServiceType: '',
     vehicleType: 'Both',
     licenceCategory: 'LMV',
     registrationDate: new Date().toISOString().split('T')[0],
     admissionNumber: '',
 
-    // Section 4: Batch & Workflow
+    // Section 4: Batch & Mandatory Next Action Workflow
     batch: '',
-    workflowStage: 'Registration',
+    workflowStage: 'Registered',
     currentStatus: 'Active',
-    nextAction: '',
+    nextAction: 'Verify Documents',
+    nextActionDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    nextActionPriority: 'Medium',
     followUpDate: '',
+    llTestDate: '',
+    finalTestDate: '',
 
     // Section 5: Licence & RTO
+    sarathiAppNo: '',
     applicationNo: '',
     applicationOpen: true,
     newApplication: true,
     testDate: '',
     testStatus: 'Not Scheduled',
+    verificationNotes: '',
 
     // Section 6: Fees
     totalFee: 9000,
@@ -101,17 +122,34 @@ const StudentFormPage = () => {
       try {
         setLoading(true);
         setError(null);
-        const batchList = await getBatches();
+        const [batchList, feeList] = await Promise.all([
+          getBatches(),
+          getCourseFees({ limit: 500 })
+        ]);
         setBatches(batchList || []);
+        const srvList = Array.isArray(feeList) ? feeList : (feeList?.data || []);
+        setAvailableServices(srvList);
 
         if (isEdit) {
           const student = await getStudentById(id);
+          let initialServices = [];
+          if (Array.isArray(student.services) && student.services.length > 0) {
+            initialServices = student.services;
+          } else if (student.licenceServiceType) {
+            initialServices = student.licenceServiceType.split(',').map(s => s.trim()).filter(Boolean);
+          }
+
           setFormData({
+            category: student.category || 'A – New Application',
+            studentId: student.studentId || '',
             fullName: student.fullName || '',
             aliasSourceName: student.aliasSourceName || '',
+            leadSource: student.leadSource || 'Walk-in',
+            referral: student.referral || '',
             gender: student.gender || 'Male',
             dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
             bloodGroup: student.bloodGroup || '',
+            guardian: student.guardian || student.emergencyContact?.name || '',
 
             primaryMobile: student.primaryMobile || '',
             alternateMobile: student.alternateMobile || '',
@@ -123,29 +161,36 @@ const StudentFormPage = () => {
               pincode: student.address?.pincode || ''
             },
             emergencyContact: {
-              name: student.emergencyContact?.name || '',
-              relation: student.emergencyContact?.relation || 'Parent',
+              name: student.guardian || student.emergencyContact?.name || '',
+              relation: student.emergencyContact?.relation || 'Guardian',
               phone: student.emergencyContact?.phone || ''
             },
 
             coursePackage: student.coursePackage || 'LMV+MCWG (Fresh Licence)',
-            licenceServiceType: student.licenceServiceType || 'Fresh Licence',
+            services: initialServices,
+            licenceServiceType: student.licenceServiceType || initialServices.join(', '),
             vehicleType: student.vehicleType || 'Both',
             licenceCategory: student.licenceCategory || 'LMV',
             registrationDate: student.registrationDate ? new Date(student.registrationDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
             admissionNumber: student.admissionNumber || '',
 
             batch: student.batch ? (typeof student.batch === 'object' ? student.batch._id : student.batch) : '',
-            workflowStage: student.workflowStage || 'Registration',
+            workflowStage: student.workflowStage || 'Registered',
             currentStatus: student.currentStatus || 'Active',
-            nextAction: student.nextAction || '',
+            nextAction: student.nextAction || 'Verify Documents',
+            nextActionDueDate: student.nextActionDueDate ? new Date(student.nextActionDueDate).toISOString().split('T')[0] : (student.followUpDate ? new Date(student.followUpDate).toISOString().split('T')[0] : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+            nextActionPriority: student.nextActionPriority || 'Medium',
             followUpDate: student.followUpDate ? new Date(student.followUpDate).toISOString().split('T')[0] : '',
+            llTestDate: student.llTestDate ? new Date(student.llTestDate).toISOString().split('T')[0] : '',
+            finalTestDate: student.finalTestDate ? new Date(student.finalTestDate).toISOString().split('T')[0] : '',
 
-            applicationNo: student.applicationNo || '',
+            sarathiAppNo: student.sarathiAppNo || student.applicationNo || '',
+            applicationNo: student.applicationNo || student.sarathiAppNo || '',
             applicationOpen: student.applicationOpen !== undefined ? student.applicationOpen : true,
             newApplication: student.newApplication !== undefined ? student.newApplication : true,
             testDate: student.testDate ? new Date(student.testDate).toISOString().split('T')[0] : '',
             testStatus: student.testStatus || 'Not Scheduled',
+            verificationNotes: student.verificationNotes || '',
 
             totalFee: student.totalFee !== undefined ? student.totalFee : 9000,
             paidAmount: student.paidAmount || 0,
@@ -158,8 +203,7 @@ const StudentFormPage = () => {
               bloodGroupRecorded: false,
               form15Ready: false
             },
-            notes: student.notes || '',
-            studentId: student.studentId || ''
+            notes: student.notes || ''
           });
         }
       } catch (err) {
@@ -183,6 +227,53 @@ const StudentFormPage = () => {
   const isValidIndianMobile = (num) => {
     const cleaned = cleanPhone(num);
     return /^[6-9]\d{9}$/.test(cleaned);
+  };
+
+  const handleAddService = (serviceName) => {
+    if (!serviceName) return;
+    setFormData(prev => {
+      const current = prev.services || [];
+      if (current.includes(serviceName)) return prev;
+      const updated = [...current, serviceName];
+
+      // Sum fees of all selected services
+      let newTotalFee = 0;
+      updated.forEach(srv => {
+        const matched = availableServices.find(s => s.service === srv);
+        if (matched && matched.totalFee) {
+          newTotalFee += Number(matched.totalFee);
+        }
+      });
+
+      return {
+        ...prev,
+        services: updated,
+        licenceServiceType: updated.join(', '),
+        totalFee: newTotalFee > 0 ? newTotalFee : prev.totalFee
+      };
+    });
+  };
+
+  const handleRemoveService = (serviceName) => {
+    setFormData(prev => {
+      const current = prev.services || [];
+      const updated = current.filter(s => s !== serviceName);
+
+      let newTotalFee = 0;
+      updated.forEach(srv => {
+        const matched = availableServices.find(s => s.service === srv);
+        if (matched && matched.totalFee) {
+          newTotalFee += Number(matched.totalFee);
+        }
+      });
+
+      return {
+        ...prev,
+        services: updated,
+        licenceServiceType: updated.join(', '),
+        totalFee: updated.length === 0 ? 9000 : (newTotalFee > 0 ? newTotalFee : prev.totalFee)
+      };
+    });
   };
 
   const handleChange = (e) => {
@@ -248,6 +339,15 @@ const StudentFormPage = () => {
       }
     }
 
+    // P0: Mandatory Next Action Enforcement
+    if (!formData.nextAction || !formData.nextAction.trim()) {
+      errors.nextAction = 'Next Action is mandatory on student records.';
+    }
+
+    if (!formData.nextActionDueDate) {
+      errors.nextActionDueDate = 'Next Action Due Date is mandatory.';
+    }
+
     if (totalFeeNum < 0) errors.totalFee = 'Total Fee must be a non-negative number.';
     if (paidNum < 0) errors.paidAmount = 'Paid Amount must be a non-negative number.';
     if (advanceNum < 0) errors.advanceAmount = 'Advance Amount must be a non-negative number.';
@@ -259,28 +359,26 @@ const StudentFormPage = () => {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
-    setSuccessMessage(null);
-
-    if (!validateForm()) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
+  const executeSave = async (overrideDuplicate = false) => {
     try {
       setSubmitting(true);
+      setError(null);
 
       const payload = {
         ...formData,
+        confirmDuplicate: overrideDuplicate || confirmedDuplicate,
         fullName: formData.fullName.trim(),
         aliasSourceName: formData.aliasSourceName ? formData.aliasSourceName.trim() : '',
+        leadSource: formData.leadSource || 'Walk-in',
+        referral: formData.referral ? formData.referral.trim() : '',
+        nextAction: formData.nextAction.trim(),
+        nextActionDueDate: formData.nextActionDueDate,
+        nextActionPriority: formData.nextActionPriority || 'Medium',
+        followUpDate: formData.nextActionDueDate || formData.followUpDate || null,
         totalFee: totalFeeNum,
         paidAmount: paidNum,
         advanceAmount: advanceNum,
         batch: formData.batch || null,
-        followUpDate: formData.followUpDate || null,
         testDate: formData.testDate || null,
         dob: formData.dob || null
       };
@@ -304,6 +402,47 @@ const StudentFormPage = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMessage(null);
+
+    if (!validateForm()) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // P0: Duplicate Student Detection before save
+    if (!isEdit && !confirmedDuplicate) {
+      try {
+        setSubmitting(true);
+        const dupRes = await checkDuplicateStudent({
+          mobile: formData.primaryMobile,
+          alternateMobile: formData.alternateMobile,
+          fullName: formData.fullName
+        });
+
+        if (dupRes && dupRes.isDuplicate && dupRes.duplicateStudent) {
+          setSubmitting(false);
+          setDuplicateWarning(dupRes.duplicateStudent);
+          return;
+        }
+      } catch (dupErr) {
+        console.warn('Duplicate check warning:', dupErr);
+      } finally {
+        setSubmitting(false);
+      }
+    }
+
+    await executeSave();
+  };
+
+  const handleContinueAnyway = async () => {
+    setConfirmedDuplicate(true);
+    setDuplicateWarning(null);
+    await executeSave(true);
   };
 
   if (loading) {
@@ -370,6 +509,26 @@ const StudentFormPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Register Category
+              </label>
+              <select
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-bold"
+              >
+                <option value="A – New Application">A – New Application</option>
+                <option value="B – LL Done, Test Pending">B – LL Done, Test Pending</option>
+                <option value="C – Final Test Done">C – Final Test Done</option>
+                <option value="D – Failed / Retest">D – Failed / Retest</option>
+                <option value="E – Passed, Fee Collection">E – Passed, Fee Collection</option>
+                <option value="F – Settled / Closed">F – Settled / Closed</option>
+                <option value="Archived / Removed">Archived / Removed</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Student ID
               </label>
               {isEdit ? (
@@ -380,9 +539,14 @@ const StudentFormPage = () => {
                   className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-xs font-mono font-bold text-red-600 dark:text-red-400 cursor-not-allowed"
                 />
               ) : (
-                <div className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-md text-xs font-mono text-slate-500">
-                  <span className="font-bold text-red-600">STU-XXXX</span> (Auto-assigned)
-                </div>
+                <input
+                  type="text"
+                  name="studentId"
+                  value={formData.studentId || ''}
+                  onChange={handleChange}
+                  placeholder="Custom ID (e.g. RB26-001) or leave blank for auto-gen"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md text-xs font-mono text-slate-800 dark:text-slate-100 font-bold"
+                />
               )}
             </div>
 
@@ -396,7 +560,7 @@ const StudentFormPage = () => {
                 required
                 value={formData.fullName}
                 onChange={handleChange}
-                placeholder="e.g. Mohammed Rinshad"
+                placeholder="e.g. Muhammed Bayis"
                 className={`w-full px-3 py-2 border rounded-md text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 ${
                   fieldErrors.fullName ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 dark:border-slate-700'
                 }`}
@@ -461,14 +625,64 @@ const StudentFormPage = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Guardian Name & Relation
+              </label>
+              <input
+                type="text"
+                name="guardian"
+                value={formData.guardian}
+                onChange={handleChange}
+                placeholder="e.g. Alavikutty M (Father)"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Alias / Referral Source
+                Alias / Pet Name
               </label>
               <input
                 type="text"
                 name="aliasSourceName"
                 value={formData.aliasSourceName}
                 onChange={handleChange}
-                placeholder="e.g. Walk-in, Jasirata, Sahla C/O"
+                placeholder="e.g. Jasir, Kunjumon"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Lead Source
+              </label>
+              <select
+                name="leadSource"
+                value={formData.leadSource}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium"
+              >
+                <option value="Walk-in">Walk-in</option>
+                <option value="Referral">Referral</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Instagram">Instagram</option>
+                <option value="Facebook">Facebook</option>
+                <option value="Google">Google Search</option>
+                <option value="Local Campaign">Local Campaign</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Referral Details / Reference
+              </label>
+              <input
+                type="text"
+                name="referral"
+                value={formData.referral}
+                onChange={handleChange}
+                placeholder="e.g. Sahla C/O, Old Student"
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
               />
             </div>
@@ -497,7 +711,7 @@ const StudentFormPage = () => {
                 maxLength={14}
                 value={formData.primaryMobile}
                 onChange={handleChange}
-                placeholder="10 digit Indian mobile (e.g. 9876543210)"
+                placeholder="10 digit Indian mobile (e.g. 7012362922)"
                 className={`w-full px-3 py-2 border rounded-md text-xs font-mono bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 ${
                   fieldErrors.primaryMobile ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 dark:border-slate-700'
                 }`}
@@ -511,7 +725,7 @@ const StudentFormPage = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Alternate Mobile
+                Alt Mobile
               </label>
               <input
                 type="tel"
@@ -526,29 +740,29 @@ const StudentFormPage = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Place / Village
+                Full Address
               </label>
               <input
                 type="text"
                 name="address.place"
                 value={formData.address?.place || ''}
                 onChange={handleChange}
-                placeholder="e.g. West Kodur, Pulamanthole"
+                placeholder="e.g. 212A, Malappuram (M + OG), Ernad, Malappuram, Kerala"
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                House Name / Street
+                Pincode
               </label>
               <input
                 type="text"
-                name="address.houseName"
-                value={formData.address?.houseName || ''}
+                name="address.pincode"
+                value={formData.address?.pincode || ''}
                 onChange={handleChange}
-                placeholder="House name"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
+                placeholder="e.g. 676519"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-mono"
               />
             </div>
 
@@ -564,140 +778,257 @@ const StudentFormPage = () => {
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
               />
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Guardian / Emergency Contact Name
-              </label>
-              <input
-                type="text"
-                name="emergencyContact.name"
-                value={formData.emergencyContact?.name || ''}
-                onChange={handleChange}
-                placeholder="Guardian name"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
-              />
-            </div>
           </div>
         </div>
 
-        {/* SECTION 3: Course, Batch & RTO */}
+        {/* SECTION 3: Course, Batch, Sarathi & Test Dates */}
         <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
           <div className="border-b border-slate-100 dark:border-slate-700 pb-3 flex items-center justify-between">
             <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
               <Layers size={17} className="text-red-600" />
-              Section 3 — Course, Batch & Licence Service
+              Section 3 — Service, Vehicle/COV, Batch, Sarathi & Test Dates
             </h3>
             <span className="text-[11px] text-slate-400 font-medium">Training Configuration</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Course Package
+            <div className="sm:col-span-2 space-y-2">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Assigned Services (Select one or more services)
               </label>
-              <select
-                name="coursePackage"
-                value={formData.coursePackage}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-semibold"
-              >
-                <option value="LMV+MCWG (Fresh Licence)">LMV + MCWG (Fresh Licence)</option>
-                <option value="LMV (4 Wheeler Only)">LMV (4 Wheeler Only)</option>
-                <option value="MCWG (2 Wheeler Only)">MCWG (2 Wheeler Only)</option>
-                <option value="3W Addition">3 Wheeler Addition</option>
-                <option value="Heavy Licence">Heavy Licence Application</option>
-                <option value="Post Licence Training">Post Licence Training (Expertise)</option>
-                <option value="Licence Renewal">Licence Renewal Service</option>
-              </select>
+
+              {/* Selected Services Badges */}
+              <div className="flex flex-wrap items-center gap-1.5 min-h-[42px] p-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md">
+                {formData.services && formData.services.length > 0 ? (
+                  formData.services.map((srv, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800 text-xs font-bold rounded-md shadow-2xs"
+                    >
+                      <span>{srv}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveService(srv)}
+                        className="text-red-500 hover:text-red-700 dark:hover:text-red-200 font-bold ml-0.5 focus:outline-none"
+                        title={`Remove ${srv}`}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-slate-400 italic">No services assigned. Select from dropdown below to add services.</span>
+                )}
+              </div>
+
+              {/* Service Selection Dropdown */}
+              <div className="flex items-center gap-2">
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleAddService(e.target.value);
+                      e.target.value = '';
+                    }
+                  }}
+                  defaultValue=""
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-semibold focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="" disabled>+ Add Official Service Package (Official 2026 BENZ Structure)...</option>
+                  {availableServices.map((s) => {
+                    const isSelected = formData.services?.includes(s.service);
+                    return (
+                      <option key={s._id || s.feeId} value={s.service} disabled={isSelected}>
+                        {isSelected ? '✓ ' : '+ '}{s.service} (₹{s.totalFee ? s.totalFee.toLocaleString('en-IN') : '0'})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Licence Service Type
-              </label>
-              <select
-                name="licenceServiceType"
-                value={formData.licenceServiceType}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
-              >
-                <option value="Fresh Licence">Fresh Licence</option>
-                <option value="Retest">Retest</option>
-                <option value="Endorsement">Endorsement</option>
-                <option value="Licence Renewal">Licence Renewal</option>
-                <option value="3W Addition">3W Addition</option>
-                <option value="Post Licence Training">Post Licence Training</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Assign to Batch
-              </label>
-              <select
-                name="batch"
-                value={formData.batch}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium"
-              >
-                <option value="">-- Unassigned (Assign Later) --</option>
-                {batches.map((b) => (
-                  <option key={b._id} value={b._id}>
-                    {b.name} ({b.session || 'Session'} | {b.startTime}-{b.endTime})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Sarathi Application No.
+                Vehicle / COV
               </label>
               <input
                 type="text"
-                name="applicationNo"
-                value={formData.applicationNo}
+                name="vehicleType"
+                value={formData.vehicleType}
                 onChange={handleChange}
-                placeholder="RTO Application Number"
+                placeholder="e.g. LMV+MCWG, 2/4 Wheeler, MCWOG, MCWG"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-semibold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Batch
+              </label>
+              <input
+                type="text"
+                name="batchName"
+                value={formData.batchName || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, batchName: e.target.value }))}
+                placeholder="e.g. 2026 NEW LL, BATCH 1, FINAL LL INTAKE"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Sarathi App No
+              </label>
+              <input
+                type="text"
+                name="sarathiAppNo"
+                value={formData.sarathiAppNo}
+                onChange={handleChange}
+                placeholder="Sarathi Application Number (e.g. 3739581826)"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-mono font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                LL Test Date
+              </label>
+              <input
+                type="date"
+                name="llTestDate"
+                value={formData.llTestDate}
+                onChange={handleChange}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-mono"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Student Lifecycle Status
+                Final Test Date
               </label>
-              <select
-                name="currentStatus"
-                value={formData.currentStatus}
+              <input
+                type="date"
+                name="finalTestDate"
+                value={formData.finalTestDate}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-bold"
-              >
-                <option value="New">New</option>
-                <option value="Active">Active</option>
-                <option value="Training">Training</option>
-                <option value="Test Pending">Test Pending</option>
-                <option value="Test Scheduled">Test Scheduled</option>
-                <option value="Passed">Passed</option>
-                <option value="Completed">Completed</option>
-                <option value="Retest">Retest</option>
-                <option value="Pending">Pending</option>
-                <option value="Inactive">Inactive</option>
-              </select>
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-mono"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                RTO Test Date (If Scheduled)
+                Status
+              </label>
+              <input
+                type="text"
+                name="currentStatus"
+                value={formData.currentStatus}
+                onChange={handleChange}
+                placeholder="e.g. New LL Application Submitted, LL Slot Booked, Passed"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Next Action
+              </label>
+              <input
+                type="text"
+                name="nextAction"
+                value={formData.nextAction}
+                onChange={handleChange}
+                placeholder="e.g. Complete Documents + Fee + LL Slot Booking, Attend LL Test"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Next Action Date
               </label>
               <input
                 type="date"
-                name="testDate"
-                value={formData.testDate}
+                name="followUpDate"
+                value={formData.followUpDate}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-mono"
               />
+            </div>
+
+            <div className="sm:col-span-2 lg:col-span-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+              <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Calendar size={15} className="text-amber-600 dark:text-amber-400" />
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wide">
+                    Mandatory Next Action (R&D Operating Requirement)
+                  </h4>
+                  <span className="text-[10px] bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded">
+                    Required
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Next Action Description <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="nextAction"
+                      required
+                      value={formData.nextAction}
+                      onChange={handleChange}
+                      placeholder="e.g. Verify Documents, Schedule LL Test"
+                      className={`w-full px-3 py-2 border rounded-md text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 ${
+                        fieldErrors.nextAction ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 dark:border-slate-700'
+                      }`}
+                    />
+                    {fieldErrors.nextAction && (
+                      <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.nextAction}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Due Date <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="nextActionDueDate"
+                      required
+                      value={formData.nextActionDueDate}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-md text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 ${
+                        fieldErrors.nextActionDueDate ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 dark:border-slate-700'
+                      }`}
+                    />
+                    {fieldErrors.nextActionDueDate && (
+                      <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.nextActionDueDate}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Priority Level
+                    </label>
+                    <select
+                      name="nextActionPriority"
+                      value={formData.nextActionPriority}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-semibold"
+                    >
+                      <option value="Low">Low Priority</option>
+                      <option value="Medium">Medium Priority</option>
+                      <option value="High">High Priority</option>
+                      <option value="Urgent">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -830,18 +1161,34 @@ const StudentFormPage = () => {
             })}
           </div>
 
-          <div className="pt-2">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              General Remarks & Notes
-            </label>
-            <textarea
-              name="notes"
-              rows="3"
-              value={formData.notes}
-              onChange={handleChange}
-              placeholder="e.g. Needs evening slots, preparing for test in May, previous DL retest"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs focus:ring-2 focus:ring-red-500"
-            ></textarea>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Verification Details & Source Status
+              </label>
+              <input
+                type="text"
+                name="verificationNotes"
+                value={formData.verificationNotes}
+                onChange={handleChange}
+                placeholder="e.g. Source Verified / Acknowledgement, Imported / Not Reviewed"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs font-medium focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                General Remarks & Notes
+              </label>
+              <textarea
+                name="notes"
+                rows="2"
+                value={formData.notes}
+                onChange={handleChange}
+                placeholder="e.g. Needs evening slots, preparing for test in May, previous DL retest"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md text-xs focus:ring-2 focus:ring-red-500"
+              ></textarea>
+            </div>
           </div>
         </div>
 
@@ -864,6 +1211,76 @@ const StudentFormPage = () => {
           </button>
         </div>
       </form>
+
+      {/* P0: Duplicate Student Warning Modal */}
+      {duplicateWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-amber-300 dark:border-amber-600 max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <AlertCircle size={22} />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  Possible Existing Student
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  This person may already exist.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg p-3.5 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Name:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100">{duplicateWarning.fullName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Mobile:</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{duplicateWarning.primaryMobile}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Student ID:</span>
+                <span className="font-mono font-bold text-red-600 dark:text-red-400">{duplicateWarning.studentId}</span>
+              </div>
+              {duplicateWarning.currentStatus && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Status:</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{duplicateWarning.currentStatus}</span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              Review existing record before creating a duplicate to prevent split records and fragmented payments.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => window.open(`/students/${duplicateWarning._id}`, '_blank')}
+                className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-md text-xs font-bold transition flex items-center justify-center gap-1.5"
+              >
+                <ExternalLink size={13} /> View Existing Student
+              </button>
+              <button
+                type="button"
+                onClick={handleContinueAnyway}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-bold transition"
+              >
+                Continue Anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => setDuplicateWarning(null)}
+                className="px-3 py-2 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-md text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 };

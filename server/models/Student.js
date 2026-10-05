@@ -18,6 +18,16 @@ const studentSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    leadSource: {
+      type: String,
+      enum: ['Walk-in', 'Referral', 'WhatsApp', 'Instagram', 'Facebook', 'Google', 'Local Campaign', 'Other'],
+      default: 'Walk-in'
+    },
+    referral: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     gender: {
       type: String,
       enum: ['Male', 'Female', 'Other'],
@@ -62,7 +72,7 @@ const studentSchema = new mongoose.Schema(
     },
     vehicleType: {
       type: String,
-      enum: ['2 Wheeler', '4 Wheeler', 'Both', '3 Wheeler', 'Heavy'],
+      trim: true,
       default: '4 Wheeler'
     },
     licenceCategory: {
@@ -98,10 +108,38 @@ const studentSchema = new mongoose.Schema(
     ],
 
     // Licence & RTO Pipeline
+    category: {
+      type: String,
+      trim: true
+    },
+    sarathiAppNo: {
+      type: String,
+      trim: true
+    },
+    verificationNotes: {
+      type: String,
+      trim: true
+    },
+    guardian: {
+      type: String,
+      trim: true
+    },
+    llTestDate: {
+      type: Date
+    },
+    finalTestDate: {
+      type: Date
+    },
+    services: [
+      {
+        type: String,
+        trim: true
+      }
+    ],
     licenceServiceType: {
       type: String,
       trim: true,
-      default: 'Fresh Licence'
+      default: ''
     },
     applicationNo: {
       type: String,
@@ -288,7 +326,16 @@ const studentSchema = new mongoose.Schema(
     enquiry: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Enquiry'
-    }
+    },
+    // Historical Migration Tracking
+    legacySource: { type: String, default: '' },
+    legacyId: { type: String, default: '' },
+    migrationStatus: {
+      type: String,
+      enum: ['None', 'Sample', 'Full', 'Verified'],
+      default: 'None'
+    },
+    migrationVerifiedAt: { type: Date }
   },
   {
     timestamps: true,
@@ -296,6 +343,13 @@ const studentSchema = new mongoose.Schema(
     toObject: { virtuals: true }
   }
 );
+
+// Virtual populate for applications
+studentSchema.virtual('applications', {
+  ref: 'Application',
+  localField: '_id',
+  foreignField: 'student'
+});
 
 // Virtual property for Balance
 studentSchema.virtual('balance').get(function () {

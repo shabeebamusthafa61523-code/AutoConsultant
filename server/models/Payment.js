@@ -54,6 +54,42 @@ const paymentSchema = new mongoose.Schema(
       enum: ['Completed', 'Pending', 'Cancelled'],
       default: 'Completed'
     },
+    application: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Application',
+      default: null,
+      index: true
+    },
+    applicationId: {
+      type: String,
+      trim: true,
+      default: '',
+      index: true
+    },
+    receivedBy: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    feeBreakdown: {
+      packageFee: { type: Number, default: 0 },
+      rtoServiceFee: { type: Number, default: 0 },
+      retestFee: { type: Number, default: 0 },
+      otherCharges: { type: Number, default: 0 },
+      discount: { type: Number, default: 0 },
+      netPayable: { type: Number, default: 0 },
+      totalReceived: { type: Number, default: 0 },
+      balanceDue: { type: Number, default: 0 }
+    },
+    // Historical Migration Tracking
+    legacySource: { type: String, default: '' },
+    legacyId: { type: String, default: '' },
+    migrationStatus: {
+      type: String,
+      enum: ['None', 'Sample', 'Full', 'Verified'],
+      default: 'None'
+    },
+    migrationVerifiedAt: { type: Date },
     recordedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'

@@ -21,7 +21,8 @@ import {
   BookOpen,
   TrendingDown,
   Clock,
-  Briefcase
+  Briefcase,
+  FileText
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -34,6 +35,7 @@ const Sidebar = () => {
       items: [
         { label: 'Dashboard', path: '/', icon: LayoutDashboard },
         { label: 'Students', path: '/students', icon: Users },
+        { label: 'Applications', path: '/applications', icon: Layers },
         { label: 'Workflow Control', path: '/workflow', icon: GitPullRequest },
         { label: 'Calendar / Follow-Up', path: '/calendar', icon: CalendarCheck },
         { label: 'Enquiries', path: '/enquiries', icon: HelpCircle }
@@ -64,6 +66,7 @@ const Sidebar = () => {
       title: 'RECORDS & ADMIN',
       items: [
         { label: 'Student Documents', path: '/student-documents', icon: FileCheck },
+        { label: 'Reports', path: '/reports', icon: FileText },
         { label: 'Complaints', path: '/complaints', icon: AlertCircle },
         { label: 'Users', path: '/users', icon: UserCheck }
       ]
