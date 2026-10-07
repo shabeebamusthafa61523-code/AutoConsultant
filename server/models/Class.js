@@ -139,6 +139,44 @@ const classSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       default: null
+    },
+
+    // Live GPS Telemetry Fields
+    telemetryMode: {
+      type: String,
+      enum: ['MANUAL', 'GPS_LIVE', 'MOBILE_TRACKER'],
+      default: 'MANUAL'
+    },
+    gpsSession: {
+      status: {
+        type: String,
+        enum: ['IDLE', 'IN_PROGRESS', 'COMPLETED', 'ABORTED'],
+        default: 'IDLE'
+      },
+      startedAt: { type: Date },
+      stoppedAt: { type: Date },
+      startLocation: {
+        lat: { type: Number },
+        lng: { type: Number },
+        address: { type: String, default: '' }
+      },
+      endLocation: {
+        lat: { type: Number },
+        lng: { type: Number },
+        address: { type: String, default: '' }
+      },
+      waypoints: [
+        {
+          lat: { type: Number, required: true },
+          lng: { type: Number, required: true },
+          timestamp: { type: Date, default: Date.now },
+          speed: { type: Number, default: 0 },
+          accuracy: { type: Number, default: 0 },
+          eventId: { type: String }
+        }
+      ],
+      calculatedGpsKm: { type: Number, default: 0 },
+      deviceId: { type: String, trim: true, default: '' }
     }
   },
   {
@@ -182,7 +220,7 @@ classSchema.index({ createdAt: -1 });
 classSchema.pre('save', async function (next) {
   try {
     if (this.kmEnd !== undefined && this.kmStart !== undefined && this.kmEnd > this.kmStart) {
-      this.kmDriven = this.kmEnd - this.kmStart;
+      this.kmDriven = Math.round((this.kmEnd - this.kmStart) * 100) / 100;
       this.km = this.kmDriven;
     } else if (this.kmDriven > 0) {
       this.km = this.kmDriven;

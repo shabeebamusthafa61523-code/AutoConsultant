@@ -214,9 +214,10 @@ const applicationSchema = new mongoose.Schema(
     legacyId: { type: String, default: '' },
     migrationStatus: {
       type: String,
-      enum: ['None', 'Sample', 'Full', 'Verified'],
+      enum: ['None', 'Sample', 'Full', 'Verified', 'Committed', 'RolledBack'],
       default: 'None'
     },
+    migrationBatchId: { type: String, default: '' },
     migrationVerifiedAt: { type: Date },
 
     notes: { type: String, trim: true, default: '' }

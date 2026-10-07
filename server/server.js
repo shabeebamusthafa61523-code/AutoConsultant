@@ -26,6 +26,9 @@ const expenseRoutes = require('./routes/expenseRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 const migrationRoutes = require('./routes/migrationRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const whatsappRoutes = require('./routes/whatsappRoutes');
+const attendanceRoutes = require('./routes/attendanceRoutes');
+const telemetryRoutes = require('./routes/telemetryRoutes');
 
 // Connect to MongoDB Atlas
 connectDB();
@@ -65,6 +68,9 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/migration', migrationRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/telemetry', telemetryRoutes);
 
 // Centralized Error Handler
 app.use(errorHandler);
