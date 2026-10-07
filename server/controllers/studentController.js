@@ -1049,8 +1049,8 @@ const bulkImportStudents = async (req, res, next) => {
       let cleanedMobile = cleanPhone(rawMobile);
 
       if (!cleanedMobile || !/^[6-9]\d{9}$/.test(cleanedMobile)) {
-        const seedStr = String(i + 1).padStart(5, '0');
-        cleanedMobile = `90000${seedStr}`;
+        skippedRecords.push({ row: i + 1, name: fullName, reason: 'Missing or invalid 10-digit Indian mobile number' });
+        continue;
       }
 
       let duplicateMobileWarning = null;
