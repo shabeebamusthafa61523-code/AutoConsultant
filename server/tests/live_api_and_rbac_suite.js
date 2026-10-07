@@ -87,7 +87,7 @@ async function runLiveApiSuite() {
     }
 
     // Set known password for login tests
-    adminUser.password = 'password123';
+    adminUser.password = 'admin123';
     await adminUser.save();
     staffUser.password = 'password123';
     await staffUser.save();
@@ -137,7 +137,7 @@ async function runLiveApiSuite() {
     // 1.4 Valid Login
     const adminLoginRes = await request(`${BASE_URL}/users/login`, {
       method: 'POST',
-      body: { username: adminUser.username, password: 'password123' }
+      body: { username: adminUser.username, password: 'admin123' }
     });
     if (adminLoginRes.status === 200 && adminLoginRes.data.token) {
       adminToken = adminLoginRes.data.token;

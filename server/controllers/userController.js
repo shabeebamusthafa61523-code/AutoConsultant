@@ -6,18 +6,21 @@ const bcrypt = require('bcryptjs');
 // @route   POST /api/users/login
 const loginUser = async (req, res, next) => {
   try {
-    const { username, password } = req.body;
+    const rawIdentifier = req.body.username || req.body.email || req.body.identifier;
+    const { password } = req.body;
 
-    if (!username || !password) {
+    if (!rawIdentifier || !password) {
       res.status(400);
       throw new Error('Please enter username/email and password.');
     }
 
+    const identifier = String(rawIdentifier).trim().toLowerCase();
+
     // Find user by username or email
     const user = await User.findOne({
       $or: [
-        { username: username.toLowerCase() },
-        { email: username.toLowerCase() }
+        { username: identifier },
+        { email: identifier }
       ]
     });
 

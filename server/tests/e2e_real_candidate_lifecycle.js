@@ -52,7 +52,7 @@ async function runRealCandidateLifecycle() {
     const adminUser = await User.findOne({ role: 'Superadmin', status: 'Active' });
     const adminLogin = await request(`${BASE_URL}/users/login`, {
       method: 'POST',
-      body: { username: adminUser.username, password: 'password123' }
+      body: { username: adminUser.username, password: 'admin123' }
     });
     const token = adminLogin.data.token;
     const authHeaders = { Authorization: `Bearer ${token}` };

@@ -80,7 +80,7 @@ async function runComprehensiveSuite() {
       });
     }
 
-    admin.password = 'password123';
+    admin.password = 'admin123';
     await admin.save();
     manager.password = 'password123';
     await manager.save();
@@ -90,7 +90,7 @@ async function runComprehensiveSuite() {
     // Login each user
     const adminLogin = await request(`${BASE_URL}/users/login`, {
       method: 'POST',
-      body: { username: admin.username, password: 'password123' }
+      body: { username: admin.username, password: 'admin123' }
     });
     const adminToken = adminLogin.data.token;
 
